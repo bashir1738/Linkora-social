@@ -128,3 +128,32 @@ fn test_sequential_posts() {
     // Verify both exist and are distinct
     assert!(post_id1 != post_id2);
 }
+
+#[test]
+fn test_like_post() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let contract_id = env.register(LinkoraContract, ());
+    let client = LinkoraContractClient::new(&env, &contract_id);
+
+    let author = Address::generate(&env);
+    let user1 = Address::generate(&env);
+    let user2 = Address::generate(&env);
+
+    let post_id = client.create_post(&author, &String::from_str(&env, "Test post"));
+
+    // First like
+    client.like_post(&user1, &post_id);
+    assert_eq!(client.get_like_count(&post_id), 1);
+    assert!(client.has_liked(&user1, &post_id));
+
+    // Duplicate like (should be idempotent)
+    client.like_post(&user1, &post_id);
+    assert_eq!(client.get_like_count(&post_id), 1);
+
+    // Another user likes
+    client.like_post(&user2, &post_id);
+    assert_eq!(client.get_like_count(&post_id), 2);
+    assert!(client.has_liked(&user2, &post_id));
+}

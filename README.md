@@ -62,7 +62,7 @@ The primary contract is `LinkoraContract`.
 ### Data Models
 
 - `Profile`: stores a user address, username, and creator token address
-- `Post`: stores post id, author, content, total tips, and timestamp
+- `Post`: stores post id, author, content, total tips, timestamp, and like count
 - `Pool`: stores a pool token address and tracked balance
 
 ### Public Functions
@@ -81,6 +81,12 @@ The primary contract is `LinkoraContract`.
   Returns a post by id if it exists.
 - `tip(tipper, post_id, token, amount)`
   Transfers SEP-41 tokens to the post author and updates the post tip total.
+- `like_post(user, post_id)`
+  Records a like reaction from a user for a post. Idempotent.
+- `get_like_count(post_id)`
+  Returns the total number of likes for a post.
+- `has_liked(user, post_id)`
+  Returns whether a user has liked a specific post.
 - `pool_deposit(depositor, pool_id, token, amount)`
   Deposits tokens into a community pool tracked by `pool_id`.
 - `pool_withdraw(recipient, pool_id, amount)`
