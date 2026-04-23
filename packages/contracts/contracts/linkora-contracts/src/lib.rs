@@ -12,6 +12,7 @@ const PROFILES: Symbol = symbol_short!("PROFILES");
 const FOLLOWS: Symbol = symbol_short!("FOLLOWS");
 const POOLS: Symbol = symbol_short!("POOLS");
 const ADMIN: Symbol = symbol_short!("ADMIN");
+const INITIALIZED: Symbol = symbol_short!("INIT");
 
 // ── Data Types ───────────────────────────────────────────────────────────────
 
@@ -220,16 +221,18 @@ impl LinkoraContract {
 
     // ── Upgradability ─────────────────────────────────────────────────────────
 
+    /// One-time initialization. Stores the admin address and sets the
+    /// INITIALIZED flag in instance storage. Panics if called again.
     pub fn initialize(env: Env, admin: Address) {
-        if env.storage().persistent().has(&ADMIN) {
+        if env.storage().instance().get::<Symbol, bool>(&INITIALIZED).unwrap_or(false) {
             panic!("already initialized");
         }
-        env.storage().persistent().set(&ADMIN, &admin);
+        env.storage().instance().set(&INITIALIZED, &true);
+        env.storage().instance().set(&ADMIN, &admin);
     }
 
     pub fn upgrade(env: Env, new_wasm_hash: BytesN<32>) {
-        let admin: Address = env.storage().persistent().get(&ADMIN).expect("not initialized");
-        admin.require_auth();
+        Self::require_admin(&env);
 
         env.deployer().update_current_contract_wasm(new_wasm_hash.clone());
 
@@ -237,6 +240,18 @@ impl LinkoraContract {
             (symbol_short!("upgraded"),),
             ContractUpgraded { new_wasm_hash },
         );
+    }
+
+    // ── Internal helpers ──────────────────────────────────────────────────────
+
+    /// Reads the stored admin and requires their auth. Panics if not initialized.
+    fn require_admin(env: &Env) {
+        let admin: Address = env
+            .storage()
+            .instance()
+            .get(&ADMIN)
+            .expect("not initialized");
+        admin.require_auth();
     }
 }
 

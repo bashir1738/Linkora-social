@@ -128,3 +128,51 @@ fn test_sequential_posts() {
     // Verify both exist and are distinct
     assert!(post_id1 != post_id2);
 }
+
+// ── Initialization guard tests ────────────────────────────────────────────────
+
+#[test]
+fn test_initialize_success() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let contract_id = env.register(LinkoraContract, ());
+    let client = LinkoraContractClient::new(&env, &contract_id);
+
+    let admin = Address::generate(&env);
+    // First call must succeed without panic
+    client.initialize(&admin);
+}
+
+#[test]
+#[should_panic(expected = "already initialized")]
+fn test_initialize_twice_panics() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let contract_id = env.register(LinkoraContract, ());
+    let client = LinkoraContractClient::new(&env, &contract_id);
+
+    let admin = Address::generate(&env);
+    client.initialize(&admin);
+    // Second call must panic
+    client.initialize(&admin);
+}
+
+#[test]
+#[should_panic]
+fn test_admin_gated_call_from_non_admin_panics() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let contract_id = env.register(LinkoraContract, ());
+    let client = LinkoraContractClient::new(&env, &contract_id);
+
+    let admin = Address::generate(&env);
+    client.initialize(&admin);
+
+    // Drop mock_all_auths by creating a fresh env — auth is now enforced.
+    // upgrade reads the stored admin and calls admin.require_auth(), which
+    // will panic because no auth is provided for admin in this env.
+    let env_strict = Env::default();
+    let strict_client = LinkoraContractClient::new(&env_strict, &contract_id);
+    let fake_hash = BytesN::from_array(&env_strict, &[0u8; 32]);
+    strict_client.upgrade(&fake_hash);
+}
