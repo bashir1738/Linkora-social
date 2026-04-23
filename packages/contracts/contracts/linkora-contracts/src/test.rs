@@ -90,3 +90,41 @@ fn test_pool_deposit_withdraw() {
     assert_eq!(pool.balance, 800);
     assert_eq!(TokenClient::new(&env, &token).balance(&user), 9_200);
 }
+
+#[test]
+fn test_sequential_posts() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let contract_id = env.register(LinkoraContract, ());
+    let client = LinkoraContractClient::new(&env, &contract_id);
+
+    let author = Address::generate(&env);
+
+    // Set first timestamp
+    let ts1 = 1000;
+    env.ledger().set_timestamp(ts1);
+
+    // Create first post
+    let post_id1 = client.create_post(&author, &String::from_str(&env, "First post"));
+    assert_eq!(post_id1, 1, "First post ID should be 1");
+
+    let post1 = client.get_post(&post_id1).unwrap();
+    assert_eq!(post1.timestamp, ts1, "First post timestamp should match ledger");
+    assert_eq!(post1.id, 1);
+
+    // Advance timestamp
+    let ts2 = 2000;
+    env.ledger().set_timestamp(ts2);
+
+    // Create second post
+    let post_id2 = client.create_post(&author, &String::from_str(&env, "Second post"));
+    assert_eq!(post_id2, 2, "Second post ID should be 2");
+
+    let post2 = client.get_post(&post_id2).unwrap();
+    assert_eq!(post2.timestamp, ts2, "Second post timestamp should match updated ledger");
+    assert_eq!(post2.id, 2);
+
+    // Verify both exist and are distinct
+    assert!(post_id1 != post_id2);
+}
