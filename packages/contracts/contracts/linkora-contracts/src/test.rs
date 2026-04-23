@@ -47,6 +47,115 @@ fn test_follow() {
 }
 
 #[test]
+fn test_unfollow() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let contract_id = env.register(LinkoraContract, ());
+    let client = LinkoraContractClient::new(&env, &contract_id);
+
+    let alice = Address::generate(&env);
+    let bob = Address::generate(&env);
+    
+    // Follow then unfollow
+    client.follow(&alice, &bob);
+    assert_eq!(client.get_following(&alice).len(), 1);
+    
+    client.unfollow(&alice, &bob);
+    assert_eq!(client.get_following(&alice).len(), 0);
+}
+
+#[test]
+fn test_double_unfollow() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let contract_id = env.register(LinkoraContract, ());
+    let client = LinkoraContractClient::new(&env, &contract_id);
+
+    let alice = Address::generate(&env);
+    let bob = Address::generate(&env);
+    
+    // Unfollow without following first (should be no-op)
+    client.unfollow(&alice, &bob);
+    assert_eq!(client.get_following(&alice).len(), 0);
+    
+    // Follow, unfollow, then unfollow again (should be no-op)
+    client.follow(&alice, &bob);
+    client.unfollow(&alice, &bob);
+    client.unfollow(&alice, &bob);
+    assert_eq!(client.get_following(&alice).len(), 0);
+}
+
+#[test]
+fn test_followers_reverse_index() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let contract_id = env.register(LinkoraContract, ());
+    let client = LinkoraContractClient::new(&env, &contract_id);
+
+    let alice = Address::generate(&env);
+    let bob = Address::generate(&env);
+    let charlie = Address::generate(&env);
+    
+    // Alice and Charlie follow Bob
+    client.follow(&alice, &bob);
+    client.follow(&charlie, &bob);
+    
+    // Bob should have 2 followers
+    let followers = client.get_followers(&bob);
+    assert_eq!(followers.len(), 2);
+    assert!(followers.contains(&alice));
+    assert!(followers.contains(&charlie));
+    
+    // Alice should be following Bob
+    let following = client.get_following(&alice);
+    assert_eq!(following.len(), 1);
+    assert_eq!(following.get(0).unwrap(), bob);
+}
+
+#[test]
+fn test_follower_following_symmetry() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let contract_id = env.register(LinkoraContract, ());
+    let client = LinkoraContractClient::new(&env, &contract_id);
+
+    let alice = Address::generate(&env);
+    let bob = Address::generate(&env);
+    let charlie = Address::generate(&env);
+    
+    // Create follow relationships
+    client.follow(&alice, &bob);
+    client.follow(&alice, &charlie);
+    client.follow(&bob, &charlie);
+    
+    // Verify Alice's following list
+    let alice_following = client.get_following(&alice);
+    assert_eq!(alice_following.len(), 2);
+    assert!(alice_following.contains(&bob));
+    assert!(alice_following.contains(&charlie));
+    
+    // Verify Bob's followers and following
+    let bob_followers = client.get_followers(&bob);
+    assert_eq!(bob_followers.len(), 1);
+    assert_eq!(bob_followers.get(0).unwrap(), alice);
+    
+    let bob_following = client.get_following(&bob);
+    assert_eq!(bob_following.len(), 1);
+    assert_eq!(bob_following.get(0).unwrap(), charlie);
+    
+    // Verify Charlie's followers
+    let charlie_followers = client.get_followers(&charlie);
+    assert_eq!(charlie_followers.len(), 2);
+    assert!(charlie_followers.contains(&alice));
+    assert!(charlie_followers.contains(&bob));
+    
+    // Unfollow and verify symmetry is maintained
+    client.unfollow(&alice, &bob);
+    assert_eq!(client.get_following(&alice).len(), 1);
+    assert_eq!(client.get_followers(&bob).len(), 0);
+}
+
+#[test]
 fn test_post_and_tip() {
     let env = Env::default();
     env.mock_all_auths();
