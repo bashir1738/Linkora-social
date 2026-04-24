@@ -17,6 +17,7 @@ const POSTS: Symbol = symbol_short!("POSTS");
 const POST_CT: Symbol = symbol_short!("POST_CT");
 const PROFILES: Symbol = symbol_short!("PROFILES");
 const FOLLOWS: Symbol = symbol_short!("FOLLOWS");
+const FOLLOWERS: Symbol = symbol_short!("FOLLOWRS"); // Reverse index for followers
 const POOLS: Symbol = symbol_short!("POOLS");
 const ADMIN: Symbol = symbol_short!("ADMIN");
 
@@ -128,13 +129,16 @@ impl LinkoraContract {
 
     // ── Social Graph ─────────────────────────────────────────────────────────
 
+    /// Follow a user. Maintains both forward (following) and reverse (followers) indexes.
     pub fn follow(env: Env, follower: Address, followee: Address) {
         follower.require_auth();
-        let key = (FOLLOWS, follower.clone());
-        let mut list: Vec<Address> = env
+        
+        // Update following list
+        let following_key = (FOLLOWS, follower.clone());
+        let mut following_list: Vec<Address> = env
             .storage()
             .persistent()
-            .get(&key)
+            .get(&following_key)
             .unwrap_or(Vec::new(&env));
         if !list.contains(&followee) {
             list.push_back(followee.clone());
@@ -147,10 +151,53 @@ impl LinkoraContract {
         );
     }
 
+    /// Unfollow a user. Removes from both forward and reverse indexes.
+    /// No-op if the relationship doesn't exist.
+    pub fn unfollow(env: Env, follower: Address, followee: Address) {
+        follower.require_auth();
+        
+        // Update following list
+        let following_key = (FOLLOWS, follower.clone());
+        let mut following_list: Vec<Address> = env
+            .storage()
+            .persistent()
+            .get(&following_key)
+            .unwrap_or(Vec::new(&env));
+        
+        // Find and remove followee from following list
+        if let Some(index) = following_list.iter().position(|addr| addr == followee) {
+            following_list.remove(index as u32);
+            env.storage().persistent().set(&following_key, &following_list);
+            
+            // Update reverse index (followers)
+            let followers_key = (FOLLOWERS, followee);
+            let mut followers_list: Vec<Address> = env
+                .storage()
+                .persistent()
+                .get(&followers_key)
+                .unwrap_or(Vec::new(&env));
+            
+            if let Some(index) = followers_list.iter().position(|addr| addr == follower) {
+                followers_list.remove(index as u32);
+                env.storage().persistent().set(&followers_key, &followers_list);
+            }
+        }
+        // If relationship doesn't exist, it's a no-op (no panic)
+    }
+
+    /// Get the list of users that a given user is following.
     pub fn get_following(env: Env, user: Address) -> Vec<Address> {
         env.storage()
             .persistent()
             .get(&(FOLLOWS, user))
+            .unwrap_or(Vec::new(&env))
+    }
+
+    /// Get the list of users following a given user (reverse index).
+    pub fn get_followers(env: Env, user: Address) -> Vec<Address> {
+        env.storage()
+            .persistent()
+            .get(&(FOLLOWERS, user))
             .unwrap_or(Vec::new(&env))
     }
 
