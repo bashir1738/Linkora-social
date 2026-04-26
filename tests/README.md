@@ -52,16 +52,19 @@ The script will:
 
 ## CI Separation
 
-Keep integration tests separate from unit tests because they require Docker and a running sandbox.
+Integration tests are kept separate from unit tests because they require Docker and a running sandbox.
 
-Example CI step:
+The dedicated workflow is at [`.github/workflows/integration.yml`](../.github/workflows/integration.yml). It:
+
+- Triggers on `workflow_dispatch` (manual) and on a **nightly schedule** (02:00 UTC).
+- Installs Rust, `stellar-cli`, and verifies Docker availability before running the suite.
+- Is intentionally separate from the unit-test CI workflow so standard PRs are not blocked by sandbox requirements.
+
+To trigger the integration run manually, go to **Actions → Integration Tests → Run workflow** in the GitHub UI.
+
+Unit tests continue to run in their own workflow on every push/PR:
 
 ```yaml
 - name: Run unit tests
   run: pnpm --filter contracts test
-
-- name: Run integration tests
-  run: pnpm test:integration
 ```
-
-If your CI environment cannot run Docker, keep unit tests required and run this integration suite in a dedicated job or nightly workflow.
