@@ -81,6 +81,32 @@ The primary contract is `LinkoraContract`.
 | `pool_withdraw(recipient, pool_id, amount)` | Withdraw tokens from a community pool to the caller. `amount` must be greater than zero and must not exceed the pool balance. | `recipient` | `recipient: Address` — token receiver<br>`pool_id: Symbol` — pool identifier<br>`amount: i128` — token units to withdraw (must be > 0) | `()` |
 | `get_pool(pool_id)` | Fetch the current state of a pool. | None | `pool_id: Symbol` | `Option<Pool>` |
 
+## Storage Layout
+
+Linkora-socials uses Soroban's state storage to manage its data. Below is a summary of the storage keys and namespaces used by the contract.
+
+### Storage Namespaces
+
+- **Instance Storage**: Used for contract-wide configuration and small, frequently updated counters (e.g., admin address, post counter).
+- **Persistent Storage**: Used for all user-generated data like profiles, posts, and social relationships. This data is subject to TTL extensions to remain on-chain.
+
+### Key Mapping
+
+| Key | Format | Namespace | Purpose |
+|---|---|---|---|
+| `PROFILES` | `(Symbol("PROFILES"), Address)` | Persistent | Stores user `Profile` data. |
+| `FOLLOWS` | `(Symbol("FOLLOWS"), Address)` | Persistent | Stores a `Vec<Address>` of accounts that the given address follows. |
+| `FOLLOWRS` | `(Symbol("FOLLOWRS"), Address)` | Persistent | Stores a `Vec<Address>` of accounts following the given address. |
+| `POSTS` | `(Symbol("POSTS"), u64)` | Persistent | Stores individual `Post` objects by their incremental ID. |
+| `POST_CT` | `Symbol("POST_CT")` | Instance | Tracks the total number of posts created (used for ID generation). |
+| `POOLS` | `(Symbol("POOLS"), Symbol)` | Persistent | Stores `Pool` data for named community pools. |
+| `LIKES` | `(Symbol("LIKES"), u64, Address)` | Persistent | Records whether a specific user has liked a specific post. |
+| `ADMIN` | `Symbol("ADMIN")` | Instance | Stores the contract administrator's address. |
+| `INIT` | `Symbol("INIT")` | Instance | Boolean flag indicating if the contract has been initialized. |
+
+> [!NOTE]
+> This storage layout is designed for the prototype phase and has not been optimized for large-scale data or minimal footprint.
+
 ## Prerequisites
 
 Install the following before working on the project:
