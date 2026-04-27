@@ -243,7 +243,6 @@ impl LinkoraContract {
 
     pub fn follow(env: Env, follower: Address, followee: Address) {
         follower.require_auth();
-
         if Self::is_blocked(env.clone(), followee.clone(), follower.clone()) {
             panic!("blocked");
         }
@@ -273,9 +272,10 @@ impl LinkoraContract {
                 .persistent()
                 .set(&followers_key, &followers_list);
             Self::bump(&env, &followers_key);
-        }
 
-        FollowEvent { follower, followee }.publish(&env);
+            FollowEvent { follower, followee }.publish(&env); // Move inside if block
+        }
+        // Remove the unconditional publish at the end
     }
 
     pub fn unfollow(env: Env, follower: Address, followee: Address) {
@@ -308,9 +308,10 @@ impl LinkoraContract {
                     .set(&followers_key, &followers_list);
                 Self::bump(&env, &followers_key);
             }
-        }
 
-        UnfollowEvent { follower, followee }.publish(&env);
+            UnfollowEvent { follower, followee }.publish(&env); // Move inside if block
+        }
+        // Remove the unconditional publish at the end
     }
 
     pub fn get_following(env: Env, user: Address) -> Vec<Address> {
@@ -493,7 +494,12 @@ impl LinkoraContract {
         env.storage().persistent().set(&key, &post);
         Self::bump(&env, &key);
 
-        TipEvent { tipper, post_id, amount }.publish(&env);
+        TipEvent {
+            tipper,
+            post_id,
+            amount,
+        }
+        .publish(&env);
     }
 
     // ── Community Pool ────────────────────────────────────────────────────────
@@ -553,7 +559,12 @@ impl LinkoraContract {
         env.storage().persistent().set(&key, &pool);
         Self::bump(&env, &key);
 
-        PoolDepositEvent { depositor, pool_id, amount }.publish(&env);
+        PoolDepositEvent {
+            depositor,
+            pool_id,
+            amount,
+        }
+        .publish(&env);
     }
 
     /// Withdraw from a pool. Requires `threshold` valid admin signatures.
@@ -591,7 +602,12 @@ impl LinkoraContract {
             &amount,
         );
 
-        PoolWithdrawEvent { recipient, pool_id, amount }.publish(&env);
+        PoolWithdrawEvent {
+            recipient,
+            pool_id,
+            amount,
+        }
+        .publish(&env);
     }
 
     pub fn get_pool(env: Env, pool_id: Symbol) -> Option<Pool> {
