@@ -101,6 +101,16 @@ We use a standard GitHub flow. Please follow these branching and PR conventions:
 3. Make sure all tests pass locally before opening the PR.
 4. Fill out the [Pull Request Template](.github/pull_request_template.md) completely.
 
+## Contract Versioning Policy
+
+The contract crate version in `packages/contracts/contracts/linkora-contracts/Cargo.toml` must stay in sync with `CHANGELOG.md`.
+
+- Patch bump (`x.y.Z`): internal fixes that do not change contract interface or behavior expected by integrators.
+- Minor bump (`x.Y.z`): backward-compatible additions such as new read functions or optional flows.
+- Major bump (`X.y.z`): breaking changes to function signatures, auth model, storage assumptions, or event contracts.
+
+When a PR changes contract behavior, include a changelog entry and update the crate version in the same PR.
+
 ### PR Checklist
 
 Before submitting or requesting a review, verify the following (as found in our PR template):

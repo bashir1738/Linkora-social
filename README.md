@@ -220,6 +220,10 @@ When contributing:
 - add or update tests for behavior changes
 - document any new contract method or breaking interface change
 
+## Security
+
+Please review `SECURITY.md` for vulnerability disclosure guidance and scope.
+
 ## Troubleshooting
 
 ### Common Setup Issues
