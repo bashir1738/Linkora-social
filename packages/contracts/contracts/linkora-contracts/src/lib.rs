@@ -20,6 +20,12 @@ const INITIALIZED: Symbol = symbol_short!("INIT");
 const BLOCKS: Symbol = symbol_short!("BLOCKS");
 const LIKES: Symbol = symbol_short!("LIKES");
 
+#[contracttype]
+pub enum StorageKey {
+    Posts(u64),
+    AuthorPosts(Address),
+}
+
 // ── TTL Constants ─────────────────────────────────────────────────────────────
 //
 // LEDGER_BUMP: target TTL (~30 days at 5s/ledger).
@@ -383,7 +389,7 @@ impl LinkoraContract {
         validate_content(&content).expect("invalid content");
 
         let id: u64 = env.storage().instance().get(&POST_CT).unwrap_or(0u64) + 1;
-        let key = (POSTS, id);
+        let key = StorageKey::Posts(id);
         env.storage().persistent().set(
             &key,
             &Post {
@@ -396,6 +402,17 @@ impl LinkoraContract {
             },
         );
         Self::bump(&env, &key);
+
+        let author_posts_key = StorageKey::AuthorPosts(author.clone());
+        let mut author_posts: Vec<u64> = env
+            .storage()
+            .persistent()
+            .get(&author_posts_key)
+            .unwrap_or(Vec::new(&env));
+        author_posts.push_back(id);
+        env.storage().persistent().set(&author_posts_key, &author_posts);
+        Self::bump(&env, &author_posts_key);
+
         env.storage().instance().set(&POST_CT, &id);
         PostCreatedEvent { id, author }.publish(&env);
         id
@@ -406,7 +423,7 @@ impl LinkoraContract {
     }
 
     pub fn get_post(env: Env, id: u64) -> Option<Post> {
-        let key = (POSTS, id);
+        let key = StorageKey::Posts(id);
         let result: Option<Post> = env.storage().persistent().get(&key);
         if result.is_some() {
             Self::bump(&env, &key);
@@ -414,14 +431,41 @@ impl LinkoraContract {
         result
     }
 
+    pub fn get_posts_by_author(env: Env, author: Address) -> Vec<u64> {
+        let key = StorageKey::AuthorPosts(author);
+        let result: Vec<u64> = env
+            .storage()
+            .persistent()
+            .get(&key)
+            .unwrap_or(Vec::new(&env));
+        if !result.is_empty() {
+            Self::bump(&env, &key);
+        }
+        result
+    }
+
     pub fn delete_post(env: Env, author: Address, post_id: u64) {
         author.require_auth();
-        let key = (POSTS, post_id);
+        let key = StorageKey::Posts(post_id);
         let post: Post = env.storage().persistent().get(&key).unwrap_or_else(|| {
             panic!("post does not exist: {}", post_id);
         });
         assert!(post.author == author, "only author can delete post");
         env.storage().persistent().remove(&key);
+
+        let author_posts_key = StorageKey::AuthorPosts(author.clone());
+        if let Some(mut author_posts) = env
+            .storage()
+            .persistent()
+            .get::<_, Vec<u64>>(&author_posts_key)
+        {
+            if let Some(idx) = author_posts.iter().position(|id| id == post_id) {
+                author_posts.remove(idx as u32);
+                env.storage().persistent().set(&author_posts_key, &author_posts);
+                Self::bump(&env, &author_posts_key);
+            }
+        }
+
         PostDeleted { post_id, author }.publish(&env);
     }
 
@@ -435,7 +479,7 @@ impl LinkoraContract {
             return;
         }
 
-        let post_key = (POSTS, post_id);
+        let post_key = StorageKey::Posts(post_id);
         let mut post: Post = env
             .storage()
             .persistent()
@@ -449,7 +493,7 @@ impl LinkoraContract {
     }
 
     pub fn get_like_count(env: Env, post_id: u64) -> u64 {
-        let key = (POSTS, post_id);
+        let key = StorageKey::Posts(post_id);
         let result: Option<Post> = env.storage().persistent().get(&key);
         result.map(|p| p.like_count).unwrap_or(0)
     }
@@ -465,7 +509,7 @@ impl LinkoraContract {
         assert!(amount > 0, "tip amount must be positive");
         tipper.require_auth();
 
-        let key = (POSTS, post_id);
+        let key = StorageKey::Posts(post_id);
         let mut post: Post = env.storage().persistent().get(&key).unwrap_or_else(|| {
             panic!("post not found: {}", post_id);
         });
