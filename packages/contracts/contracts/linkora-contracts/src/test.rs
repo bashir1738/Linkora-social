@@ -291,6 +291,74 @@ fn test_delete_post_non_existent() {
     client.delete_post(&author, &999);
 }
 
+// ── validate_username tests ───────────────────────────────────────────────────
+
+#[test]
+#[should_panic(expected = "username too short")]
+fn test_username_too_short() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let (client, _, _) = setup_contract(&env);
+
+    let user = Address::generate(&env);
+    let token = Address::generate(&env);
+    // "ab" is 2 chars — below the 3-char minimum
+    client.set_profile(&user, &String::from_str(&env, "ab"), &token);
+}
+
+#[test]
+#[should_panic(expected = "username too long")]
+fn test_username_too_long() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let (client, _, _) = setup_contract(&env);
+
+    let user = Address::generate(&env);
+    let token = Address::generate(&env);
+    // 33 chars — above the 32-char maximum
+    client.set_profile(&user, &String::from_str(&env, "a_username_that_is_way_too_long_xx"), &token);
+}
+
+#[test]
+#[should_panic(expected = "invalid username character")]
+fn test_username_with_space() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let (client, _, _) = setup_contract(&env);
+
+    let user = Address::generate(&env);
+    let token = Address::generate(&env);
+    client.set_profile(&user, &String::from_str(&env, "bad name"), &token);
+}
+
+#[test]
+#[should_panic(expected = "invalid username character")]
+fn test_username_with_special_character() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let (client, _, _) = setup_contract(&env);
+
+    let user = Address::generate(&env);
+    let token = Address::generate(&env);
+    client.set_profile(&user, &String::from_str(&env, "bad@name"), &token);
+}
+
+#[test]
+fn test_username_boundary_min() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let (client, _, _) = setup_contract(&env);
+
+    let user = Address::generate(&env);
+    let token = Address::generate(&env);
+    // exactly 3 chars — should succeed
+    client.set_profile(&user, &String::from_str(&env, "abc"), &token);
+    let profile = client.get_profile(&user).unwrap();
+    assert_eq!(profile.username, String::from_str(&env, "abc"));
+}
+
+#[test]
+fn test_username_boundary_max() {
 #[test]
 fn test_pool_deposit_emits_event() {
 #[should_panic(expected = "content cannot be empty")]
@@ -498,6 +566,12 @@ fn test_pool_withdraw_missing_pool_panics() {
     env.mock_all_auths();
     let (client, _, _) = setup_contract(&env);
 
+    let user = Address::generate(&env);
+    let token = Address::generate(&env);
+    // exactly 32 chars — should succeed
+    client.set_profile(&user, &String::from_str(&env, "valid_username_32_chars_exactly_"), &token);
+    let profile = client.get_profile(&user).unwrap();
+    assert_eq!(profile.username, String::from_str(&env, "valid_username_32_chars_exactly_"));
     let signer = Address::generate(&env);
     let recipient = Address::generate(&env);
     let missing_pool_id = symbol_short!("nopool");
