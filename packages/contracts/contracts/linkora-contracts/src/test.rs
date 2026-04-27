@@ -291,6 +291,8 @@ fn test_delete_post_non_existent() {
     client.delete_post(&author, &999);
 }
 
+#[test]
+fn test_like_post_ttl_bump() {
 // ── validate_username tests ───────────────────────────────────────────────────
 
 #[test]
@@ -300,6 +302,32 @@ fn test_username_too_short() {
     env.mock_all_auths();
     let (client, _, _) = setup_contract(&env);
 
+    let author = Address::generate(&env);
+    let user = Address::generate(&env);
+    let post_id = client.create_post(&author, &String::from_str(&env, "TTL test"));
+
+    let post_key = (POSTS, post_id);
+    
+    // Initial TTL is set in create_post
+    let initial_ttl = env.storage().persistent().get_ttl(&post_key);
+    assert_eq!(initial_ttl, LEDGER_BUMP);
+
+    // Advance ledger to reduce TTL
+    env.ledger().with_mut(|li| {
+        li.sequence_number += 100;
+    });
+
+    assert!(env.storage().persistent().get_ttl(&post_key) < LEDGER_BUMP);
+
+    // Like the post
+    client.like_post(&user, &post_id);
+
+    // Post TTL should be bumped
+    assert_eq!(env.storage().persistent().get_ttl(&post_key), LEDGER_BUMP);
+
+    // Like entry TTL should also be at LEDGER_BUMP
+    let like_key = (LIKES, post_id, user);
+    assert_eq!(env.storage().persistent().get_ttl(&like_key), LEDGER_BUMP);
     let user = Address::generate(&env);
     let token = Address::generate(&env);
     // "ab" is 2 chars — below the 3-char minimum
