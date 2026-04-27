@@ -278,7 +278,6 @@ impl LinkoraContract {
 
     pub fn follow(env: Env, follower: Address, followee: Address) {
         follower.require_auth();
-
         if Self::is_blocked(env.clone(), followee.clone(), follower.clone()) {
             panic!("blocked");
         }
@@ -308,9 +307,10 @@ impl LinkoraContract {
                 .persistent()
                 .set(&followers_key, &followers_list);
             Self::bump(&env, &followers_key);
-        }
 
-        FollowEvent { follower, followee }.publish(&env);
+            FollowEvent { follower, followee }.publish(&env); // Move inside if block
+        }
+        // Remove the unconditional publish at the end
     }
 
     pub fn unfollow(env: Env, follower: Address, followee: Address) {
@@ -344,6 +344,9 @@ impl LinkoraContract {
                 Self::bump(&env, &followers_key);
             }
 
+            UnfollowEvent { follower, followee }.publish(&env); // Move inside if block
+        }
+        // Remove the unconditional publish at the end
             env.events()
                 .publish_event(&UnfollowEvent { follower, followee });
         }

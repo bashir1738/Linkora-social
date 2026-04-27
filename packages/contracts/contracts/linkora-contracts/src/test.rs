@@ -324,6 +324,35 @@ fn test_delete_post_non_existent() {
 }
 
 #[test]
+fn test_profile_set_event_emitted() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let (client, _, _) = setup_contract(&env);
+
+    let user = Address::generate(&env);
+    let token = Address::generate(&env);
+    let username = String::from_str(&env, "alice");
+
+    client.set_profile(&user, &username, &token);
+
+    // Pull all events and find ProfileSetEvent
+    let events = env.events().all();
+    let event = events
+        .iter()
+        .find(|e| {
+            e.0 == client.address && // emitted by our contract
+        e.1 == symbol_short!("ProfileSetEvent").into_val(&env) // event name as topic
+        })
+        .expect("ProfileSetEvent not found");
+
+    // Decode topics + data: ProfileSetEvent { user, username }
+    let (user_topic, username_data): (Address, String) = env.from_val(&event.2);
+    assert_eq!(user_topic, user);
+    assert_eq!(username_data, username);
+}
+
+#[test]
+fn test_post_created_event_emitted() {
 fn test_like_post_ttl_bump() {
 // ── validate_username tests ───────────────────────────────────────────────────
 
@@ -375,6 +404,29 @@ fn test_username_too_long() {
 
     let user = Address::generate(&env);
     let token = Address::generate(&env);
+    let username1 = String::from_str(&env, "alice");
+    let username2 = String::from_str(&env, "alice_new");
+
+    client.set_profile(&user, &username1, &token);
+
+    // Clear events to isolate the second call
+    env.events().all(); // consume
+
+    client.set_profile(&user, &username2, &token);
+
+    let events = env.events().all();
+    let event = events
+        .iter()
+        .find(|e| e.0 == client.address && e.1 == symbol_short!("ProfileSetEvent").into_val(&env))
+        .expect("ProfileSetEvent not found after update");
+
+    let (user_topic, username_data): (Address, String) = env.from_val(&event.2);
+    assert_eq!(user_topic, user);
+    assert_eq!(username_data, username2);
+}
+
+#[test]
+fn test_follow_event_emitted() {
     // 33 chars — above the 32-char maximum
     client.set_profile(&user, &String::from_str(&env, "a_username_that_is_way_too_long_xx"), &token);
 }
@@ -386,6 +438,25 @@ fn test_username_with_space() {
     env.mock_all_auths();
     let (client, _, _) = setup_contract(&env);
 
+    let alice = Address::generate(&env);
+    let bob = Address::generate(&env);
+
+    client.follow(&alice, &bob);
+
+    let events = env.events().all();
+    let event = events
+        .iter()
+        .find(|e| e.0 == client.address && e.1 == symbol_short!("FollowEvent").into_val(&env))
+        .expect("FollowEvent not found");
+
+    // FollowEvent { #[topic] follower, #[topic] followee }
+    let (follower, followee): (Address, Address) = env.from_val(&event.2);
+    assert_eq!(follower, alice);
+    assert_eq!(followee, bob);
+}
+
+#[test]
+fn test_no_duplicate_follow_event() {
     let user = Address::generate(&env);
     let token = Address::generate(&env);
     client.set_profile(&user, &String::from_str(&env, "bad name"), &token);
@@ -398,6 +469,35 @@ fn test_username_with_special_character() {
     env.mock_all_auths();
     let (client, _, _) = setup_contract(&env);
 
+    let alice = Address::generate(&env);
+    let bob = Address::generate(&env);
+
+    client.follow(&alice, &bob);
+    let count_after_first = env
+        .events()
+        .all()
+        .iter()
+        .filter(|e| e.1 == symbol_short!("FollowEvent").into_val(&env))
+        .count();
+
+    // Follow again - should be no-op
+    client.follow(&alice, &bob);
+    let count_after_second = env
+        .events()
+        .all()
+        .iter()
+        .filter(|e| e.1 == symbol_short!("FollowEvent").into_val(&env))
+        .count();
+
+    assert_eq!(count_after_first, 1);
+    assert_eq!(
+        count_after_second, 1,
+        "Duplicate FollowEvent emitted on repeat follow"
+    );
+}
+
+#[test]
+fn test_unfollow_event_emitted() {
     let user = Address::generate(&env);
     let token = Address::generate(&env);
     client.set_profile(&user, &String::from_str(&env, "bad@name"), &token);
@@ -409,6 +509,156 @@ fn test_username_boundary_min() {
     env.mock_all_auths();
     let (client, _, _) = setup_contract(&env);
 
+    let alice = Address::generate(&env);
+    let bob = Address::generate(&env);
+
+    client.follow(&alice, &bob);
+    env.events().all(); // clear previous events
+
+    client.unfollow(&alice, &bob);
+
+    let events = env.events().all();
+    let event = events
+        .iter()
+        .find(|e| e.0 == client.address && e.1 == symbol_short!("UnfollowEvent").into_val(&env))
+        .expect("UnfollowEvent not found");
+
+    // UnfollowEvent { #[topic] follower, #[topic] followee }
+    let (follower, followee): (Address, Address) = env.from_val(&event.2);
+    assert_eq!(follower, alice);
+    assert_eq!(followee, bob);
+}
+
+#[test]
+fn test_no_unfollow_event_on_noop() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let (client, _, _) = setup_contract(&env);
+
+    let alice = Address::generate(&env);
+    let bob = Address::generate(&env);
+
+    // Never followed bob, so unfollow should be no-op
+    client.unfollow(&alice, &bob);
+
+    let unfollow_events = env
+        .events()
+        .all()
+        .iter()
+        .filter(|e| e.1 == symbol_short!("UnfollowEvent").into_val(&env))
+        .count();
+
+    assert_eq!(
+        unfollow_events, 0,
+        "UnfollowEvent emitted when no relationship existed"
+    );
+}
+
+#[test]
+fn test_tip_event_emitted_with_gross_amount() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let (client, _, treasury) = setup_contract(&env);
+
+    let author = Address::generate(&env);
+    let tipper = Address::generate(&env);
+    let token = setup_token(&env, &tipper);
+    let post_id = client.create_post(&author, &String::from_str(&env, "tip me"));
+
+    let gross_amount: i128 = 1000;
+    client.tip(&tipper, &post_id, &token, &gross_amount);
+
+    let events = env.events().all();
+    let event = events
+        .iter()
+        .find(|e| e.0 == client.address && e.1 == symbol_short!("TipEvent").into_val(&env))
+        .expect("TipEvent not found");
+
+    // TipEvent { #[topic] tipper, #[topic] post_id, amount }
+    let (tipper_topic, post_id_topic, amount_data): (Address, u64, i128) = env.from_val(&event.2);
+    assert_eq!(tipper_topic, tipper);
+    assert_eq!(post_id_topic, post_id);
+    assert_eq!(
+        amount_data, gross_amount,
+        "TipEvent amount should be gross, not net"
+    );
+}
+
+#[test]
+fn test_tip_event_amount_equals_gross_with_fee() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let contract_id = env.register(LinkoraContract, ());
+    let client = LinkoraContractClient::new(&env, &contract_id);
+
+    let admin = Address::generate(&env);
+    let treasury = Address::generate(&env);
+    let author = Address::generate(&env);
+    let tipper = Address::generate(&env);
+
+    // 2.5% fee = 250 bps
+    client.initialize(&admin, &treasury, &250);
+
+    let token = setup_token(&env, &tipper);
+    let post_id = client.create_post(&author, &String::from_str(&env, "fee test"));
+    let gross_amount: i128 = 1000;
+
+    client.tip(&tipper, &post_id, &token, &gross_amount);
+
+    // Verify actual token splits happened correctly
+    let token_client = TokenClient::new(&env, &token);
+    assert_eq!(token_client.balance(&treasury), 25); // 2.5% of 1000
+    assert_eq!(token_client.balance(&author), 975); // 1000 - 25
+
+    // But event should still show gross amount
+    let events = env.events().all();
+    let event = events
+        .iter()
+        .find(|e| e.0 == client.address && e.1 == symbol_short!("TipEvent").into_val(&env))
+        .expect("TipEvent not found");
+
+    let (_, _, amount_data): (Address, u64, i128) = env.from_val(&event.2);
+    assert_eq!(
+        amount_data, 1000,
+        "Event amount must be gross tip when fee_bps > 0"
+    );
+}
+
+#[test]
+fn test_tip_event_amount_with_zero_fee() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let (client, _, _) = setup_contract(&env); // fee_bps = 0 from setup_contract
+
+    let author = Address::generate(&env);
+    let tipper = Address::generate(&env);
+    let token = setup_token(&env, &tipper);
+    let post_id = client.create_post(&author, &String::from_str(&env, "no fee"));
+
+    let gross_amount: i128 = 500;
+    client.tip(&tipper, &post_id, &token, &gross_amount);
+
+    // Verify full amount went to author
+    let token_client = TokenClient::new(&env, &token);
+    assert_eq!(token_client.balance(&author), 500);
+
+    let events = env.events().all();
+    let event = events
+        .iter()
+        .find(|e| e.0 == client.address && e.1 == symbol_short!("TipEvent").into_val(&env))
+        .expect("TipEvent not found");
+
+    let (_, _, amount_data): (Address, u64, i128) = env.from_val(&event.2);
+    assert_eq!(
+        amount_data, 500,
+        "Event amount should equal full transfer when fee_bps = 0"
+    );
+}
+
+#[test]
+#[should_panic(expected = "duplicate admin")]
+fn test_create_pool_duplicate_admins_panics() {
     let user = Address::generate(&env);
     let token = Address::generate(&env);
     // exactly 3 chars — should succeed
@@ -523,6 +773,11 @@ fn test_pool_deposit_negative_amount_panics() {
     env.mock_all_auths();
     let (client, admin, _) = setup_contract(&env);
 
+    let alice = Address::generate(&env);
+    let token = Address::generate(&env);
+    let pool_id = symbol_short!("duppool");
+
+    // Try to create pool with [alice, alice] and threshold = 2
     let pool_admin = Address::generate(&env);
     let depositor = Address::generate(&env);
     let token = setup_token(&env, &pool_admin);
@@ -533,6 +788,13 @@ fn test_pool_deposit_negative_amount_panics() {
         &admin,
         &pool_id,
         &token,
+        &vec![&env, alice.clone(), alice.clone()],
+        &2,
+    );
+}
+
+#[test]
+fn test_create_pool_unique_admins_succeeds() {
         &vec![&env, pool_admin.clone()],
         &1,
     );
@@ -545,6 +807,11 @@ fn test_pool_deposit_valid_positive_amount_succeeds() {
     let env = Env::default();
     env.mock_all_auths();
     let (client, admin, _) = setup_contract(&env);
+
+    let alice = Address::generate(&env);
+    let bob = Address::generate(&env);
+    let token = Address::generate(&env);
+    let pool_id = symbol_short!("okpool");
 
     let depositor = Address::generate(&env);
     let recipient = Address::generate(&env);
@@ -561,6 +828,20 @@ fn test_pool_deposit_valid_positive_amount_succeeds() {
         &admin,
         &pool_id,
         &token,
+        &vec![&env, alice.clone(), bob.clone()],
+        &2,
+    );
+
+    let pool = client.get_pool(&pool_id).unwrap();
+    assert_eq!(pool.admins.len(), 2);
+    assert_eq!(pool.threshold, 2);
+    assert!(pool.admins.contains(&alice));
+    assert!(pool.admins.contains(&bob));
+}
+
+#[test]
+#[should_panic(expected = "invalid threshold")]
+fn test_create_pool_threshold_zero_panics() {
         &vec![&env, pool_admin.clone()],
         &1,
     );
@@ -576,6 +857,10 @@ fn test_pool_withdraw_insufficient_balance_panics() {
     env.mock_all_auths();
     let (client, admin, _) = setup_contract(&env);
 
+    let alice = Address::generate(&env);
+    let token = Address::generate(&env);
+    let pool_id = symbol_short!("zeroth");
+
     let pool_admin = Address::generate(&env);
     let depositor = Address::generate(&env);
     let recipient = Address::generate(&env);
@@ -587,6 +872,29 @@ fn test_pool_withdraw_insufficient_balance_panics() {
         &admin,
         &pool_id,
         &token,
+        &vec![&env, alice],
+        &0, // threshold can't be 0
+    );
+}
+
+#[test]
+#[should_panic(expected = "invalid threshold")]
+fn test_create_pool_threshold_exceeds_admins() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let (client, admin, _) = setup_contract(&env);
+
+    let alice = Address::generate(&env);
+    let token = Address::generate(&env);
+    let pool_id = symbol_short!("badth");
+
+    client.create_pool(
+        &admin,
+        &pool_id,
+        &token,
+        &vec![&env, alice],
+        &2, // threshold > admins.len()
+    );
         &vec![&env, admin.clone()],
         &1,
     );
