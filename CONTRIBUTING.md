@@ -177,3 +177,24 @@ The `CI / Unit Tests` job runs `cargo test` inside `packages/contracts`. Your PR
 - The code does not compile (including `wasm32v1-none` target).
 
 The integration test suite (`integration.yml`) runs on a nightly schedule and on manual dispatch; it is not a required check for PRs but failures there should still be investigated promptly.
+
+## Code Owners
+
+This project uses a `CODEOWNERS` file to automatically assign reviewers based on the files changed in a pull request.
+
+### CODEOWNERS Format
+
+The `.github/CODEOWNERS` file maps directories to their maintainers:
+
+- `packages/contracts/` → Contract maintainers
+- `packages/web/` → Frontend maintainers
+- `docs/` → Documentation maintainers
+- `.github/` → All maintainers
+
+### How to Request Review from Specific Owner
+
+1. When you create a PR that touches files in the above directories, the corresponding maintainers will be automatically assigned as reviewers.
+
+2. If you need to request a review from a specific owner, you can mention them in your PR description: @Epta-Node/maintainers please review
+
+3. For urgent reviews or specific questions, you can also comment on the PR with a mention.
