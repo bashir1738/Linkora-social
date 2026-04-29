@@ -687,6 +687,127 @@ impl LinkoraContract {
         result
     }
 
+    pub fn get_pool_admins(env: Env, pool_id: Symbol) -> Vec<Address> {
+        let key = (POOLS, pool_id);
+        let pool: Pool = env.storage().persistent().get(&key).expect("pool not found");
+        Self::bump(&env, &key);
+        pool.admins
+    }
+
+    pub fn add_pool_admin(
+        env: Env,
+        signers: Vec<Address>,
+        pool_id: Symbol,
+        new_admin: Address,
+    ) {
+        let key = (POOLS, pool_id.clone());
+        let mut pool: Pool = env
+            .storage()
+            .persistent()
+            .get(&key)
+            .expect("pool not found");
+
+        // Verify threshold signatures from existing admins
+        assert!(signers.len() >= pool.threshold, "insufficient signers");
+        for signer in signers.iter() {
+            assert!(
+                pool.admins.iter().any(|x| x == signer),
+                "unauthorized signer"
+            );
+            signer.require_auth();
+        }
+
+        // Check if admin already exists
+        assert!(
+            !pool.admins.iter().any(|x| x == new_admin),
+            "admin already exists"
+        );
+
+        pool.admins.push_back(new_admin);
+        env.storage().persistent().set(&key, &pool);
+        Self::bump(&env, &key);
+    }
+
+    pub fn remove_pool_admin(
+        env: Env,
+        signers: Vec<Address>,
+        pool_id: Symbol,
+        admin: Address,
+    ) {
+        let key = (POOLS, pool_id.clone());
+        let mut pool: Pool = env
+            .storage()
+            .persistent()
+            .get(&key)
+            .expect("pool not found");
+
+        // Verify threshold signatures from existing admins
+        assert!(signers.len() >= pool.threshold, "insufficient signers");
+        for signer in signers.iter() {
+            assert!(
+                pool.admins.iter().any(|x| x == signer),
+                "unauthorized signer"
+            );
+            signer.require_auth();
+        }
+
+        // Find and remove the admin
+        let initial_len = pool.admins.len();
+        let mut new_admins = Vec::new(&env);
+        for existing_admin in pool.admins.iter() {
+            if existing_admin != admin {
+                new_admins.push_back(existing_admin.clone());
+            }
+        }
+        pool.admins = new_admins;
+        
+        assert!(pool.admins.len() < initial_len, "admin not found");
+
+        // Ensure threshold is still reachable after removal
+        assert!(
+            pool.threshold <= pool.admins.len(),
+            "threshold unreachable after removal"
+        );
+
+        env.storage().persistent().set(&key, &pool);
+        Self::bump(&env, &key);
+    }
+
+    pub fn update_pool_threshold(
+        env: Env,
+        signers: Vec<Address>,
+        pool_id: Symbol,
+        threshold: u32,
+    ) {
+        assert!(threshold > 0, "threshold must be positive");
+        let key = (POOLS, pool_id.clone());
+        let mut pool: Pool = env
+            .storage()
+            .persistent()
+            .get(&key)
+            .expect("pool not found");
+
+        // Verify threshold signatures from existing admins
+        assert!(signers.len() >= pool.threshold, "insufficient signers");
+        for signer in signers.iter() {
+            assert!(
+                pool.admins.iter().any(|x| x == signer),
+                "unauthorized signer"
+            );
+            signer.require_auth();
+        }
+
+        // Validate new threshold against admin count
+        assert!(
+            threshold <= pool.admins.len(),
+            "threshold cannot exceed admin count"
+        );
+
+        pool.threshold = threshold;
+        env.storage().persistent().set(&key, &pool);
+        Self::bump(&env, &key);
+    }
+
     // ── Fee & Treasury ────────────────────────────────────────────────────────
 
     pub fn set_fee(env: Env, fee_bps: u32) {
