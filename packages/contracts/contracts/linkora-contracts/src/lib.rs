@@ -754,7 +754,7 @@ impl LinkoraContract {
             .persistent()
             .get(&key)
             .expect("pool not found");
-        assert!(pool.token == token, "wrong token");
+        assert!(pool.token == token, "wrong token for pool");
 
         token::Client::new(&env, &token).transfer(
             &depositor,
