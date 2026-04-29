@@ -237,6 +237,12 @@ pnpm test:integration
 
 See `tests/README.md` for setup details and CI guidance.
 
+## Documentation
+
+- [Event Schema](packages/contracts/contracts/linkora-contracts/EVENTS.md) — canonical event definitions for indexers and clients
+- [Indexer Design](docs/indexer/INDEXER_DESIGN.md) — how to consume events off-chain to build a queryable social graph
+- [UI Design Spec](docs/design/SPEC.md) — layout and component design tokens
+
 ## Contributor Guide
 
 Contributions are welcome, especially in these areas:
