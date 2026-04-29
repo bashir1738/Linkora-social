@@ -134,12 +134,12 @@ fn test_follow_and_unfollow() {
     let alice = Address::generate(&env);
     let bob = Address::generate(&env);
     client.follow(&alice, &bob);
-    assert_eq!(client.get_following(&alice).len(), 1);
-    assert_eq!(client.get_followers(&bob).len(), 1);
+    assert_eq!(client.get_following(&alice, &0, &10).len(), 1);
+    assert_eq!(client.get_followers(&bob, &0, &10).len(), 1);
 
     client.unfollow(&alice, &bob);
-    assert_eq!(client.get_following(&alice).len(), 0);
-    assert_eq!(client.get_followers(&bob).len(), 0);
+    assert_eq!(client.get_following(&alice, &0, &10).len(), 0);
+    assert_eq!(client.get_followers(&bob, &0, &10).len(), 0);
 }
 
 #[test]
@@ -493,4 +493,166 @@ fn test_upgrade_before_initialize_panics() {
 
     let mock_hash = BytesN::from_array(&env, &[2u8; 32]);
     client.upgrade(&mock_hash);
+}
+
+// ── Pagination tests (#122) ───────────────────────────────────────────────────
+
+#[test]
+fn test_get_following_first_page() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let (client, _, _) = setup_contract(&env);
+
+    let alice = Address::generate(&env);
+    let users: soroban_sdk::Vec<Address> = (0..5).map(|_| Address::generate(&env)).collect();
+
+    for u in users.iter() {
+        client.follow(&alice, &u);
+    }
+
+    let page = client.get_following(&alice, &0, &3);
+    assert_eq!(page.len(), 3);
+}
+
+#[test]
+fn test_get_following_second_page() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let (client, _, _) = setup_contract(&env);
+
+    let alice = Address::generate(&env);
+    let users: soroban_sdk::Vec<Address> = (0..5).map(|_| Address::generate(&env)).collect();
+
+    for u in users.iter() {
+        client.follow(&alice, &u);
+    }
+
+    let page = client.get_following(&alice, &3, &3);
+    assert_eq!(page.len(), 2);
+}
+
+#[test]
+fn test_get_following_offset_beyond_end() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let (client, _, _) = setup_contract(&env);
+
+    let alice = Address::generate(&env);
+    let bob = Address::generate(&env);
+    client.follow(&alice, &bob);
+
+    let page = client.get_following(&alice, &100, &10);
+    assert_eq!(page.len(), 0);
+}
+
+#[test]
+#[should_panic(expected = "limit exceeded")]
+fn test_get_following_limit_exceeded() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let (client, _, _) = setup_contract(&env);
+
+    let alice = Address::generate(&env);
+    client.get_following(&alice, &0, &51);
+}
+
+#[test]
+fn test_get_followers_pagination() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let (client, _, _) = setup_contract(&env);
+
+    let target = Address::generate(&env);
+    let users: soroban_sdk::Vec<Address> = (0..5).map(|_| Address::generate(&env)).collect();
+
+    for u in users.iter() {
+        client.follow(&u, &target);
+    }
+
+    let page1 = client.get_followers(&target, &0, &3);
+    assert_eq!(page1.len(), 3);
+
+    let page2 = client.get_followers(&target, &3, &3);
+    assert_eq!(page2.len(), 2);
+}
+
+#[test]
+fn test_get_followers_offset_beyond_end() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let (client, _, _) = setup_contract(&env);
+
+    let target = Address::generate(&env);
+    let follower = Address::generate(&env);
+    client.follow(&follower, &target);
+
+    let page = client.get_followers(&target, &100, &10);
+    assert_eq!(page.len(), 0);
+}
+
+#[test]
+#[should_panic(expected = "limit exceeded")]
+fn test_get_followers_limit_exceeded() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let (client, _, _) = setup_contract(&env);
+
+    let target = Address::generate(&env);
+    client.get_followers(&target, &0, &51);
+}
+
+#[test]
+fn test_get_posts_by_author_first_page() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let (client, _, _) = setup_contract(&env);
+
+    let author = Address::generate(&env);
+    for i in 0..5u32 {
+        let content = soroban_sdk::String::from_str(&env, "post");
+        let _ = i;
+        client.create_post(&author, &content);
+    }
+
+    let page = client.get_posts_by_author(&author, &0, &3);
+    assert_eq!(page.len(), 3);
+}
+
+#[test]
+fn test_get_posts_by_author_second_page() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let (client, _, _) = setup_contract(&env);
+
+    let author = Address::generate(&env);
+    for _ in 0..5u32 {
+        client.create_post(&author, &soroban_sdk::String::from_str(&env, "post"));
+    }
+
+    let page = client.get_posts_by_author(&author, &3, &3);
+    assert_eq!(page.len(), 2);
+}
+
+#[test]
+fn test_get_posts_by_author_offset_beyond_end() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let (client, _, _) = setup_contract(&env);
+
+    let author = Address::generate(&env);
+    client.create_post(&author, &soroban_sdk::String::from_str(&env, "post"));
+
+    let page = client.get_posts_by_author(&author, &100, &10);
+    assert_eq!(page.len(), 0);
+}
+
+#[test]
+#[should_panic(expected = "limit exceeded")]
+fn test_get_posts_by_author_limit_exceeded() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let (client, _, _) = setup_contract(&env);
+
+    let author = Address::generate(&env);
+    client.get_posts_by_author(&author, &0, &51);
 }
