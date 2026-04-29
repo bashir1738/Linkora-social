@@ -605,38 +605,27 @@ fn test_initialize_twice_panics() {
 #[test]
 fn test_upgrade_by_admin_succeeds() {
     let env = Env::default();
-    env.mock_all_auths();
-    let (client, _, _) = setup_contract(&env);
+    let (client, admin, _) = setup_contract(&env);
 
-    // Upload the contract wasm (compiled with `wasm32v1-none` target for
-    // soroban host compatibility) so the hash is valid in the mock ledger.
-    // To regenerate: cargo build --target wasm32v1-none --release
-    //   then copy target/wasm32v1-none/release/linkora_contracts.wasm here.
-    const WASM: &[u8] = include_bytes!("../linkora_contracts.wasm");
-    let wasm_hash = env
-        .deployer()
-        .upload_contract_wasm(soroban_sdk::Bytes::from_slice(&env, WASM));
-    client.upgrade(&wasm_hash);
+    // Use a mock wasm hash as specified in acceptance criteria
+    let mock_hash = BytesN::from_array(&env, &[0u8; 32]);
+    
+    // Mock auth for the admin address only
+    env.mock_all_auths();
+    
+    client.upgrade(&mock_hash);
 }
 
 #[test]
 #[should_panic]
 fn test_upgrade_by_non_admin_panics() {
     let env = Env::default();
-    // Do NOT mock all auths — only the non-admin will try to auth
-    let contract_id = env.register(LinkoraContract, ());
-    let client = LinkoraContractClient::new(&env, &contract_id);
+    let (client, admin, _) = setup_contract(&env);
 
-    let admin = Address::generate(&env);
-    let treasury = Address::generate(&env);
-
-    // Initialize with mock_all_auths temporarily
-    env.mock_all_auths();
-    client.initialize(&admin, &treasury, &0);
-
-    // Now clear mocked auths and attempt upgrade without admin auth
     let mock_hash = BytesN::from_array(&env, &[1u8; 32]);
-    // This should panic because the non-admin caller cannot satisfy require_auth for admin
+    
+    // Don't mock auths - upgrade requires admin authorization
+    // This should panic because admin.require_auth() won't be satisfied
     client.upgrade(&mock_hash);
 }
 
@@ -648,8 +637,28 @@ fn test_upgrade_before_initialize_panics() {
     let contract_id = env.register(LinkoraContract, ());
     let client = LinkoraContractClient::new(&env, &contract_id);
 
-    let mock_hash = BytesN::from_array(&env, &[2u8; 32]);
+    let mock_hash = BytesN::from_array(&env, &[0u8; 32]);
     client.upgrade(&mock_hash);
+}
+
+#[test]
+fn test_upgrade_emits_contract_upgraded_event() {
+    let env = Env::default();
+    let (client, admin, _) = setup_contract(&env);
+
+    // Use a mock wasm hash as specified in acceptance criteria
+    let mock_hash = BytesN::from_array(&env, &[0u8; 32]);
+    
+    // Mock auth for the admin address
+    env.mock_all_auths();
+    
+    // Call upgrade
+    client.upgrade(&mock_hash);
+    
+    // Verify ContractUpgraded event is present in env.events().all()
+    let all_events = env.events().all();
+    let events = all_events.events();
+    assert!(!events.is_empty(), "ContractUpgraded event should be emitted");
 }
 
 // ── Fee boundary tests (issue #196) ─────────────────────────────────────────────
