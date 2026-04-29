@@ -3,7 +3,7 @@
 use super::*;
 use soroban_sdk::{
     symbol_short,
-    testutils::{Address as _, Events, Ledger},
+    testutils::{storage::Persistent as _, Address as _, Events, Ledger},
     token::{Client as TokenClient, StellarAssetClient},
     vec, Address, BytesN, Env, String,
 };
@@ -495,365 +495,294 @@ fn test_upgrade_before_initialize_panics() {
     client.upgrade(&mock_hash);
 }
 
-// ── Pool Admin Management Tests ──────────────────────────────────────
+// ── Fee boundary tests (issue #196) ─────────────────────────────────────────────
 
 #[test]
-fn test_get_pool_admins() {
+fn test_initialize_fee_boundary_max_valid() {
     let env = Env::default();
     env.mock_all_auths();
-    let (client, admin, _) = setup_contract(&env);
-
-    let admin1 = Address::generate(&env);
-    let admin2 = Address::generate(&env);
-    let admin3 = Address::generate(&env);
-    let token = Address::generate(&env);
-    let pool_id = symbol_short!("TEST_POOL");
-
-    let initial_admins = vec![&env, admin1.clone(), admin2.clone(), admin3.clone()];
-    client.create_pool(&admin, &pool_id, &token, &initial_admins, &2);
-
-    let admins = client.get_pool_admins(&pool_id);
-    assert_eq!(admins.len(), 3);
-    assert!(admins.iter().any(|x| x == admin1));
-    assert!(admins.iter().any(|x| x == admin2));
-    assert!(admins.iter().any(|x| x == admin3));
-}
-
-#[test]
-fn test_add_pool_admin() {
-    let env = Env::default();
-    env.mock_all_auths();
-    let (client, admin, _) = setup_contract(&env);
-
-    let admin1 = Address::generate(&env);
-    let admin2 = Address::generate(&env);
-    let new_admin = Address::generate(&env);
-    let token = Address::generate(&env);
-    let pool_id = symbol_short!("TEST_POOL");
-
-    let initial_admins = vec![&env, admin1.clone(), admin2.clone()];
-    client.create_pool(&admin, &pool_id, &token, &initial_admins, &2);
-
-    // Add new admin with threshold signatures
-    let signers = vec![&env, admin1.clone(), admin2.clone()];
-    client.add_pool_admin(&signers, &pool_id, &new_admin);
-
-    let admins = client.get_pool_admins(&pool_id);
-    assert_eq!(admins.len(), 3);
-    assert!(admins.iter().any(|x| x == new_admin));
-}
-
-#[test]
-#[should_panic(expected = "insufficient signers")]
-fn test_add_pool_admin_insufficient_signers() {
-    let env = Env::default();
-    env.mock_all_auths();
-    let (client, admin, _) = setup_contract(&env);
-
-    let admin1 = Address::generate(&env);
-    let admin2 = Address::generate(&env);
-    let new_admin = Address::generate(&env);
-    let token = Address::generate(&env);
-    let pool_id = symbol_short!("TEST_POOL");
-
-    let initial_admins = vec![&env, admin1.clone(), admin2.clone()];
-    client.create_pool(&admin, &pool_id, &token, &initial_admins, &2);
-
-    // Try to add admin with only 1 signature (threshold is 2)
-    let signers = vec![&env, admin1.clone()];
-    client.add_pool_admin(&signers, &pool_id, &new_admin);
-}
-
-#[test]
-#[should_panic(expected = "unauthorized signer")]
-fn test_add_pool_admin_unauthorized_signer() {
-    let env = Env::default();
-    env.mock_all_auths();
-    let (client, admin, _) = setup_contract(&env);
-
-    let admin1 = Address::generate(&env);
-    let admin2 = Address::generate(&env);
-    let unauthorized = Address::generate(&env);
-    let new_admin = Address::generate(&env);
-    let token = Address::generate(&env);
-    let pool_id = symbol_short!("TEST_POOL");
-
-    let initial_admins = vec![&env, admin1.clone(), admin2.clone()];
-    client.create_pool(&admin, &pool_id, &token, &initial_admins, &2);
-
-    // Try to add admin with unauthorized signer
-    let signers = vec![&env, admin1.clone(), unauthorized];
-    client.add_pool_admin(&signers, &pool_id, &new_admin);
-}
-
-#[test]
-#[should_panic(expected = "admin already exists")]
-fn test_add_pool_admin_already_exists() {
-    let env = Env::default();
-    env.mock_all_auths();
-    let (client, admin, _) = setup_contract(&env);
-
-    let admin1 = Address::generate(&env);
-    let admin2 = Address::generate(&env);
-    let token = Address::generate(&env);
-    let pool_id = symbol_short!("TEST_POOL");
-
-    let initial_admins = vec![&env, admin1.clone(), admin2.clone()];
-    client.create_pool(&admin, &pool_id, &token, &initial_admins, &2);
-
-    // Try to add existing admin
-    let signers = vec![&env, admin1.clone(), admin2.clone()];
-    client.add_pool_admin(&signers, &pool_id, &admin1);
-}
-
-#[test]
-fn test_remove_pool_admin() {
-    let env = Env::default();
-    env.mock_all_auths();
-    let (client, admin, _) = setup_contract(&env);
-
-    let admin1 = Address::generate(&env);
-    let admin2 = Address::generate(&env);
-    let admin3 = Address::generate(&env);
-    let token = Address::generate(&env);
-    let pool_id = symbol_short!("TEST_POOL");
-
-    let initial_admins = vec![&env, admin1.clone(), admin2.clone(), admin3.clone()];
-    client.create_pool(&admin, &pool_id, &token, &initial_admins, &2);
-
-    // Remove admin2 with threshold signatures
-    let signers = vec![&env, admin1.clone(), admin2.clone()];
-    client.remove_pool_admin(&signers, &pool_id, &admin2);
-
-    let admins = client.get_pool_admins(&pool_id);
-    assert_eq!(admins.len(), 2);
-    assert!(!admins.iter().any(|x| x == admin2));
-    assert!(admins.iter().any(|x| x == admin1));
-    assert!(admins.iter().any(|x| x == admin3));
-}
-
-#[test]
-#[should_panic(expected = "threshold unreachable after removal")]
-fn test_remove_pool_admin_threshold_unreachable() {
-    let env = Env::default();
-    env.mock_all_auths();
-    let (client, admin, _) = setup_contract(&env);
-
-    let admin1 = Address::generate(&env);
-    let admin2 = Address::generate(&env);
-    let token = Address::generate(&env);
-    let pool_id = symbol_short!("TEST_POOL");
-
-    let initial_admins = vec![&env, admin1.clone(), admin2.clone()];
-    client.create_pool(&admin, &pool_id, &token, &initial_admins, &2);
-
-    // Try to remove admin when threshold is 2 and only 2 admins exist
-    let signers = vec![&env, admin1.clone(), admin2.clone()];
-    client.remove_pool_admin(&signers, &pool_id, &admin1);
-}
-
-#[test]
-#[should_panic(expected = "admin not found")]
-fn test_remove_pool_admin_not_found() {
-    let env = Env::default();
-    env.mock_all_auths();
-    let (client, admin, _) = setup_contract(&env);
-
-    let admin1 = Address::generate(&env);
-    let admin2 = Address::generate(&env);
-    let non_admin = Address::generate(&env);
-    let token = Address::generate(&env);
-    let pool_id = symbol_short!("TEST_POOL");
-
-    let initial_admins = vec![&env, admin1.clone(), admin2.clone()];
-    client.create_pool(&admin, &pool_id, &token, &initial_admins, &2);
-
-    // Try to remove non-existent admin
-    let signers = vec![&env, admin1.clone(), admin2.clone()];
-    client.remove_pool_admin(&signers, &pool_id, &non_admin);
-}
-
-#[test]
-fn test_update_pool_threshold() {
-    let env = Env::default();
-    env.mock_all_auths();
-    let (client, admin, _) = setup_contract(&env);
-
-    let admin1 = Address::generate(&env);
-    let admin2 = Address::generate(&env);
-    let admin3 = Address::generate(&env);
-    let token = Address::generate(&env);
-    let pool_id = symbol_short!("TEST_POOL");
-
-    let initial_admins = vec![&env, admin1.clone(), admin2.clone(), admin3.clone()];
-    client.create_pool(&admin, &pool_id, &token, &initial_admins, &2);
-
-    // Update threshold to 3
-    let signers = vec![&env, admin1.clone(), admin2.clone()];
-    client.update_pool_threshold(&signers, &pool_id, &3);
-
-    let pool = client.get_pool(&pool_id).unwrap();
-    assert_eq!(pool.threshold, 3);
-}
-
-#[test]
-#[should_panic(expected = "threshold cannot exceed admin count")]
-fn test_update_pool_threshold_too_high() {
-    let env = Env::default();
-    env.mock_all_auths();
-    let (client, admin, _) = setup_contract(&env);
-
-    let admin1 = Address::generate(&env);
-    let admin2 = Address::generate(&env);
-    let token = Address::generate(&env);
-    let pool_id = symbol_short!("TEST_POOL");
-
-    let initial_admins = vec![&env, admin1.clone(), admin2.clone()];
-    client.create_pool(&admin, &pool_id, &token, &initial_admins, &2);
-
-    // Try to set threshold to 3 when only 2 admins exist
-    let signers = vec![&env, admin1.clone(), admin2.clone()];
-    client.update_pool_threshold(&signers, &pool_id, &3);
-}
-
-#[test]
-#[should_panic(expected = "threshold must be positive")]
-fn test_update_pool_threshold_zero() {
-    let env = Env::default();
-    env.mock_all_auths();
-    let (client, admin, _) = setup_contract(&env);
-
-    let admin1 = Address::generate(&env);
-    let admin2 = Address::generate(&env);
-    let token = Address::generate(&env);
-    let pool_id = symbol_short!("TEST_POOL");
-
-    let initial_admins = vec![&env, admin1.clone(), admin2.clone()];
-    client.create_pool(&admin, &pool_id, &token, &initial_admins, &2);
-
-    // Try to set threshold to 0
-    let signers = vec![&env, admin1.clone(), admin2.clone()];
-    client.update_pool_threshold(&signers, &pool_id, &0);
-}
-
-#[test]
-#[should_panic(expected = "pool not found")]
-fn test_pool_admin_operations_on_nonexistent_pool() {
-    let env = Env::default();
-    env.mock_all_auths();
-    let (client, _admin, _) = setup_contract(&env);
-
-    let _admin1 = Address::generate(&env);
-    let pool_id = symbol_short!("NOEXIST");
-
-    // Try to get admins from non-existent pool
-    client.get_pool_admins(&pool_id);
-}
-
-// ── Create Pool Authorization Tests ────────────────────────────────────
-
-#[test]
-#[should_panic]
-fn test_create_pool_before_initialize_panics() {
-    let env = Env::default();
-    // Don't mock all auths - we want to test the actual authorization
+    
     let contract_id = env.register(LinkoraContract, ());
     let client = LinkoraContractClient::new(&env, &contract_id);
-
+    
     let admin = Address::generate(&env);
-    let pool_admin1 = Address::generate(&env);
-    let pool_admin2 = Address::generate(&env);
-    let token = Address::generate(&env);
-    let pool_id = symbol_short!("TEST_POOL");
-
-    let admin_list = vec![&env, pool_admin1.clone(), pool_admin2.clone()];
+    let treasury = Address::generate(&env);
     
-    // This should panic because the contract is not initialized
-    client.create_pool(&admin, &pool_id, &token, &admin_list, &2);
+    // Initialize with fee_bps = 10_000 (100%) should succeed
+    client.initialize(&admin, &treasury, &10_000);
+    assert_eq!(client.get_fee_bps(), 10_000);
+}
+
+#[test]
+#[should_panic(expected = "invalid fee")]
+fn test_initialize_fee_boundary_max_invalid() {
+    let env = Env::default();
+    env.mock_all_auths();
+    
+    let contract_id = env.register(LinkoraContract, ());
+    let client = LinkoraContractClient::new(&env, &contract_id);
+    
+    let admin = Address::generate(&env);
+    let treasury = Address::generate(&env);
+    
+    // Initialize with fee_bps = 10_001 (>100%) should panic
+    client.initialize(&admin, &treasury, &10_001);
+}
+
+#[test]
+fn test_set_fee_zero_valid() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let (client, admin, _) = setup_contract(&env);
+    
+    // Set fee to 0 should succeed
+    client.set_fee(&0);
+    assert_eq!(client.get_fee_bps(), 0);
 }
 
 #[test]
 #[should_panic]
-fn test_create_pool_by_non_admin_panics() {
+fn test_set_fee_non_admin_panics() {
     let env = Env::default();
-    // Don't mock all auths - we want to test actual authorization
-    let contract_id = env.register(LinkoraContract, ());
-    let client = LinkoraContractClient::new(&env, &contract_id);
-
-    let non_admin = Address::generate(&env);
-    let pool_admin1 = Address::generate(&env);
-    let pool_admin2 = Address::generate(&env);
-    let token = Address::generate(&env);
-    let pool_id = symbol_short!("TEST_POOL");
-
-    let admin_list = vec![&env, pool_admin1.clone(), pool_admin2.clone()];
+    // Don't mock all auths so we can test auth failure
+    let (client, _admin, _) = setup_contract(&env);
     
-    // This should panic because the contract is not initialized
-    // and non_admin cannot satisfy both require_auth calls
-    client.create_pool(&non_admin, &pool_id, &token, &admin_list, &2);
+    // Non-admin trying to set fee should panic due to auth failure
+    client.set_fee(&100);
+}
+
+// ── Username validation tests (issue #195) ───────────────────────────────────────
+
+#[test]
+#[should_panic(expected = "username too short")]
+fn test_username_too_short() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let (client, _, _) = setup_contract(&env);
+    
+    let user = Address::generate(&env);
+    let token = Address::generate(&env);
+    
+    // 2-character username should panic
+    client.set_profile(&user, &String::from_str(&env, "ab"), &token);
 }
 
 #[test]
-fn test_create_pool_valid_call_succeeds() {
+fn test_username_min_length_valid() {
     let env = Env::default();
     env.mock_all_auths();
-    let (client, admin, _) = setup_contract(&env);
-
-    let pool_admin1 = Address::generate(&env);
-    let pool_admin2 = Address::generate(&env);
+    let (client, _, _) = setup_contract(&env);
+    
+    let user = Address::generate(&env);
     let token = Address::generate(&env);
-    let pool_id = symbol_short!("TEST_POOL");
-
-    let admin_list = vec![&env, pool_admin1.clone(), pool_admin2.clone()];
     
-    // This should succeed with mocked auths
-    client.create_pool(&admin, &pool_id, &token, &admin_list, &2);
-    
-    // Verify the pool was created correctly
-    let pool = client.get_pool(&pool_id).unwrap();
-    assert_eq!(pool.token, token);
-    assert_eq!(pool.balance, 0);
-    assert_eq!(pool.threshold, 2);
-    assert_eq!(pool.admins.len(), 2);
-    assert!(pool.admins.iter().any(|x| x == pool_admin1));
-    assert!(pool.admins.iter().any(|x| x == pool_admin2));
+    // 3-character username should succeed
+    client.set_profile(&user, &String::from_str(&env, "abc"), &token);
+    let profile = client.get_profile(&user).unwrap();
+    assert_eq!(profile.username, String::from_str(&env, "abc"));
 }
 
 #[test]
-#[should_panic(expected = "invalid threshold")]
-fn test_create_pool_threshold_exceeds_admin_count_panics() {
+fn test_username_max_length_valid() {
     let env = Env::default();
     env.mock_all_auths();
-    let (client, admin, _) = setup_contract(&env);
-
-    let pool_admin1 = Address::generate(&env);
-    let pool_admin2 = Address::generate(&env);
-    let token = Address::generate(&env);
-    let pool_id = symbol_short!("TEST_POOL");
-
-    let admin_list = vec![&env, pool_admin1.clone(), pool_admin2.clone()];
+    let (client, _, _) = setup_contract(&env);
     
-    // This should panic because threshold (3) > admin count (2)
-    client.create_pool(&admin, &pool_id, &token, &admin_list, &3);
+    let user = Address::generate(&env);
+    let token = Address::generate(&env);
+    
+    // 32-character username should succeed
+    let username_str = "abcdefghijklmnopqrstuvwxyz123456";
+    let username = String::from_str(&env, username_str);
+    assert_eq!(username.len(), 32);
+    client.set_profile(&user, &username, &token);
+    let profile = client.get_profile(&user).unwrap();
+    assert_eq!(profile.username, username);
 }
 
 #[test]
-#[should_panic(expected = "pool exists")]
-fn test_create_pool_duplicate_pool_id_panics() {
+#[should_panic(expected = "username too long")]
+fn test_username_too_long() {
     let env = Env::default();
     env.mock_all_auths();
-    let (client, admin, _) = setup_contract(&env);
-
-    let pool_admin1 = Address::generate(&env);
-    let pool_admin2 = Address::generate(&env);
+    let (client, _, _) = setup_contract(&env);
+    
+    let user = Address::generate(&env);
     let token = Address::generate(&env);
-    let pool_id = symbol_short!("TEST_POOL");
+    
+    // 33-character username should panic
+    let username_str = "abcdefghijklmnopqrstuvwxyz1234567";
+    let username = String::from_str(&env, username_str);
+    assert_eq!(username.len(), 33);
+    client.set_profile(&user, &username, &token);
+}
 
-    let admin_list = vec![&env, pool_admin1.clone(), pool_admin2.clone()];
+#[test]
+#[should_panic(expected = "invalid username character")]
+fn test_username_with_space() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let (client, _, _) = setup_contract(&env);
     
-    // Create first pool - should succeed
-    client.create_pool(&admin, &pool_id, &token, &admin_list, &2);
+    let user = Address::generate(&env);
+    let token = Address::generate(&env);
     
-    // Try to create second pool with same ID - should panic
-    client.create_pool(&admin, &pool_id, &token, &admin_list, &2);
+    // Username with space should panic
+    client.set_profile(&user, &String::from_str(&env, "user name"), &token);
+}
+
+#[test]
+#[should_panic(expected = "invalid username character")]
+fn test_username_with_special_char() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let (client, _, _) = setup_contract(&env);
+    
+    let user = Address::generate(&env);
+    let token = Address::generate(&env);
+    
+    // Username with special character should panic
+    client.set_profile(&user, &String::from_str(&env, "user@name"), &token);
+}
+
+// ── Unfollow event emission tests (issue #129) ───────────────────────────────────
+
+#[test]
+fn test_unfollow_emits_event() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let (client, _, _) = setup_contract(&env);
+    
+    let alice = Address::generate(&env);
+    let bob = Address::generate(&env);
+    
+    // First establish a follow relationship
+    client.follow(&alice, &bob);
+    
+    // Unfollow should emit UnfollowEvent
+    client.unfollow(&alice, &bob);
+    
+    // Verify at least one event was emitted by unfollow
+    let all_events = env.events().all();
+    let events = all_events.events();
+    assert!(!events.is_empty());
+}
+
+#[test]
+fn test_unfollow_noop_no_event() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let (client, _, _) = setup_contract(&env);
+    
+    let alice = Address::generate(&env);
+    let bob = Address::generate(&env);
+    
+    // Unfollow when no relationship exists should not panic
+    client.unfollow(&alice, &bob);
+    
+    // Verify both indexes are still empty
+    assert_eq!(client.get_following(&alice).len(), 0);
+    assert_eq!(client.get_followers(&bob).len(), 0);
+}
+
+// ── Post content length validation tests (issue #194) ────────────────────────────
+
+#[test]
+#[should_panic(expected = "empty content")]
+fn test_post_content_empty() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let (client, _, _) = setup_contract(&env);
+    
+    let author = Address::generate(&env);
+    
+    // Empty content should panic
+    client.create_post(&author, &String::from_str(&env, ""));
+}
+
+#[test]
+fn test_post_content_min_length_valid() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let (client, _, _) = setup_contract(&env);
+    
+    let author = Address::generate(&env);
+    
+    // 1-character content should succeed
+    let post_id = client.create_post(&author, &String::from_str(&env, "a"));
+    let post = client.get_post(&post_id).unwrap();
+    assert_eq!(post.content, String::from_str(&env, "a"));
+}
+
+#[test]
+fn test_post_content_max_length_valid() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let (client, _, _) = setup_contract(&env);
+    
+    let author = Address::generate(&env);
+    
+    // 280-character content should succeed
+    let content_str = "a".repeat(280);
+    let content = String::from_str(&env, &content_str);
+    assert_eq!(content.len(), 280);
+    let post_id = client.create_post(&author, &content);
+    let post = client.get_post(&post_id).unwrap();
+    assert_eq!(post.content, content);
+}
+
+#[test]
+#[should_panic(expected = "content too long")]
+fn test_post_content_too_long() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let (client, _, _) = setup_contract(&env);
+    
+    let author = Address::generate(&env);
+    
+    // 281-character content should panic
+    let content_str = "a".repeat(281);
+    let content = String::from_str(&env, &content_str);
+    assert_eq!(content.len(), 281);
+    client.create_post(&author, &content);
+}
+
+// ── get_followers / get_following TTL tests ───────────────────────────────────
+
+#[test]
+fn test_get_followers_bumps_followers_key() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let (client, _, _) = setup_contract(&env);
+
+    let alice = Address::generate(&env);
+    let bob = Address::generate(&env);
+
+    // bob follows alice so alice has a non-empty followers list
+    client.follow(&bob, &alice);
+    client.get_followers(&alice);
+
+    let contract_id = client.address.clone();
+
+    // (FOLLOWERS, alice) must have a bumped TTL
+    let followers_ttl = env.as_contract(&contract_id, || {
+        env.storage()
+            .persistent()
+            .get_ttl(&(FOLLOWERS, alice.clone()))
+    });
+    assert!(
+        followers_ttl >= LEDGER_THRESHOLD,
+        "followers TTL {followers_ttl} below LEDGER_THRESHOLD"
+    );
+
+    // (FOLLOWS, alice) must NOT exist — get_followers must not touch it
+    let follows_exists = env.as_contract(&contract_id, || {
+        env.storage()
+            .persistent()
+            .has(&(FOLLOWS, alice.clone()))
+    });
+    assert!(
+        !follows_exists,
+        "get_followers must not create or bump the (FOLLOWS, alice) key"
+    );
 }

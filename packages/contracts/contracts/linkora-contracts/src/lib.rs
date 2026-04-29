@@ -11,6 +11,7 @@ const POSTS: Symbol = symbol_short!("POSTS");
 // This counter is used for sequential post ID generation.
 const POST_CT: Symbol = symbol_short!("POST_CT");
 const PROFILES: Symbol = symbol_short!("PROFILES");
+const USERNAMES: Symbol = symbol_short!("UNAMES");
 const PROFILE_CT: Symbol = symbol_short!("PROF_CT");
 const FOLLOWS: Symbol = symbol_short!("FOLLOWS");
 const FOLLOWERS: Symbol = symbol_short!("FOLLOWRS");
@@ -93,6 +94,24 @@ pub struct UnfollowEvent {
     pub follower: Address,
     #[topic]
     pub followee: Address,
+}
+
+#[contractevent]
+#[derive(Clone)]
+pub struct BlockEvent {
+    #[topic]
+    pub blocker: Address,
+    #[topic]
+    pub blocked: Address,
+}
+
+#[contractevent]
+#[derive(Clone)]
+pub struct UnblockEvent {
+    #[topic]
+    pub blocker: Address,
+    #[topic]
+    pub blocked: Address,
 }
 
 #[contractevent]
@@ -195,6 +214,10 @@ fn validate_content(content: &String) -> Result<(), &'static str> {
     Ok(())
 }
 
+fn username_lookup_key(username: &String) -> (Symbol, String) {
+    (USERNAMES, username.clone())
+}
+
 #[contractimpl]
 impl LinkoraContract {
     // ── Initialization ────────────────────────────────────────────────────────
@@ -222,6 +245,26 @@ impl LinkoraContract {
         validate_username(&username).expect("invalid username");
 
         let key = (PROFILES, user.clone());
+        let username_index_key = username_lookup_key(&username);
+
+        if let Some(existing_owner) = env
+            .storage()
+            .persistent()
+            .get::<(Symbol, String), Address>(&username_index_key)
+        {
+            if existing_owner != user {
+                panic!("username taken");
+            }
+        }
+
+        if let Some(existing_profile) = env.storage().persistent().get::<_, Profile>(&key) {
+            if existing_profile.username != username {
+                env.storage()
+                    .persistent()
+                    .remove(&username_lookup_key(&existing_profile.username));
+            }
+        }
+
         if !env.storage().persistent().has(&key) {
             let count: u64 = env.storage().instance().get(&PROFILE_CT).unwrap_or(0);
             env.storage().instance().set(&PROFILE_CT, &(count + 1));
@@ -234,7 +277,9 @@ impl LinkoraContract {
                 creator_token,
             },
         );
+        env.storage().persistent().set(&username_index_key, &user);
         Self::bump(&env, &key);
+        Self::bump(&env, &username_index_key);
         ProfileSetEvent { user, username }.publish(&env);
     }
 
@@ -332,6 +377,8 @@ impl LinkoraContract {
             .persistent()
             .get(&key)
             .unwrap_or(Vec::new(&env));
+        // Empty lists are never written to persistent storage, so there is no
+        // entry to bump. The TTL is only extended when the list is non-empty.
         if !result.is_empty() {
             Self::bump(&env, &key);
         }
@@ -339,12 +386,16 @@ impl LinkoraContract {
     }
 
     pub fn get_followers(env: Env, user: Address) -> Vec<Address> {
+        // Uses (FOLLOWERS, user) — distinct from the (FOLLOWS, user) key used
+        // by get_following — to avoid bumping the wrong storage entry.
         let key = (FOLLOWERS, user);
         let result: Vec<Address> = env
             .storage()
             .persistent()
             .get(&key)
             .unwrap_or(Vec::new(&env));
+        // Empty lists are never written to persistent storage, so there is no
+        // entry to bump. The TTL is only extended when the list is non-empty.
         if !result.is_empty() {
             Self::bump(&env, &key);
         }
@@ -361,9 +412,10 @@ impl LinkoraContract {
             .persistent()
             .get(&key)
             .unwrap_or(Map::new(&env));
-        blocks.set(blocked, ());
+        blocks.set(blocked.clone(), ());
         env.storage().persistent().set(&key, &blocks);
         Self::bump(&env, &key);
+        BlockEvent { blocker, blocked }.publish(&env);
     }
 
     pub fn unblock_user(env: Env, blocker: Address, blocked: Address) {
@@ -374,9 +426,10 @@ impl LinkoraContract {
             .persistent()
             .get(&key)
             .unwrap_or(Map::new(&env));
-        blocks.remove(blocked);
+        blocks.remove(blocked.clone());
         env.storage().persistent().set(&key, &blocks);
         Self::bump(&env, &key);
+        UnblockEvent { blocker, blocked }.publish(&env);
     }
 
     pub fn is_blocked(env: Env, blocker: Address, blocked: Address) -> bool {
