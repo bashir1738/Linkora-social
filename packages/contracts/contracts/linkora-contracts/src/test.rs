@@ -658,13 +658,13 @@ fn test_upgrade_before_initialize_panics() {
 fn test_initialize_fee_boundary_max_valid() {
     let env = Env::default();
     env.mock_all_auths();
-    
+
     let contract_id = env.register(LinkoraContract, ());
     let client = LinkoraContractClient::new(&env, &contract_id);
-    
+
     let admin = Address::generate(&env);
     let treasury = Address::generate(&env);
-    
+
     // Initialize with fee_bps = 10_000 (100%) should succeed
     client.initialize(&admin, &treasury, &10_000);
     assert_eq!(client.get_fee_bps(), 10_000);
@@ -675,13 +675,13 @@ fn test_initialize_fee_boundary_max_valid() {
 fn test_initialize_fee_boundary_max_invalid() {
     let env = Env::default();
     env.mock_all_auths();
-    
+
     let contract_id = env.register(LinkoraContract, ());
     let client = LinkoraContractClient::new(&env, &contract_id);
-    
+
     let admin = Address::generate(&env);
     let treasury = Address::generate(&env);
-    
+
     // Initialize with fee_bps = 10_001 (>100%) should panic
     client.initialize(&admin, &treasury, &10_001);
 }
@@ -691,7 +691,7 @@ fn test_set_fee_zero_valid() {
     let env = Env::default();
     env.mock_all_auths();
     let (client, admin, _) = setup_contract(&env);
-    
+
     // Set fee to 0 should succeed
     client.set_fee(&0);
     assert_eq!(client.get_fee_bps(), 0);
@@ -703,7 +703,7 @@ fn test_set_fee_non_admin_panics() {
     let env = Env::default();
     // Don't mock all auths so we can test auth failure
     let (client, _admin, _) = setup_contract(&env);
-    
+
     // Non-admin trying to set fee should panic due to auth failure
     client.set_fee(&100);
 }
@@ -716,10 +716,10 @@ fn test_username_too_short() {
     let env = Env::default();
     env.mock_all_auths();
     let (client, _, _) = setup_contract(&env);
-    
+
     let user = Address::generate(&env);
     let token = Address::generate(&env);
-    
+
     // 2-character username should panic
     client.set_profile(&user, &String::from_str(&env, "ab"), &token);
 }
@@ -729,10 +729,10 @@ fn test_username_min_length_valid() {
     let env = Env::default();
     env.mock_all_auths();
     let (client, _, _) = setup_contract(&env);
-    
+
     let user = Address::generate(&env);
     let token = Address::generate(&env);
-    
+
     // 3-character username should succeed
     client.set_profile(&user, &String::from_str(&env, "abc"), &token);
     let profile = client.get_profile(&user).unwrap();
@@ -744,10 +744,10 @@ fn test_username_max_length_valid() {
     let env = Env::default();
     env.mock_all_auths();
     let (client, _, _) = setup_contract(&env);
-    
+
     let user = Address::generate(&env);
     let token = Address::generate(&env);
-    
+
     // 32-character username should succeed
     let username_str = "abcdefghijklmnopqrstuvwxyz123456";
     let username = String::from_str(&env, username_str);
@@ -763,10 +763,10 @@ fn test_username_too_long() {
     let env = Env::default();
     env.mock_all_auths();
     let (client, _, _) = setup_contract(&env);
-    
+
     let user = Address::generate(&env);
     let token = Address::generate(&env);
-    
+
     // 33-character username should panic
     let username_str = "abcdefghijklmnopqrstuvwxyz1234567";
     let username = String::from_str(&env, username_str);
@@ -780,10 +780,10 @@ fn test_username_with_space() {
     let env = Env::default();
     env.mock_all_auths();
     let (client, _, _) = setup_contract(&env);
-    
+
     let user = Address::generate(&env);
     let token = Address::generate(&env);
-    
+
     // Username with space should panic
     client.set_profile(&user, &String::from_str(&env, "user name"), &token);
 }
@@ -794,10 +794,10 @@ fn test_username_with_special_char() {
     let env = Env::default();
     env.mock_all_auths();
     let (client, _, _) = setup_contract(&env);
-    
+
     let user = Address::generate(&env);
     let token = Address::generate(&env);
-    
+
     // Username with special character should panic
     client.set_profile(&user, &String::from_str(&env, "user@name"), &token);
 }
@@ -809,16 +809,16 @@ fn test_unfollow_emits_event() {
     let env = Env::default();
     env.mock_all_auths();
     let (client, _, _) = setup_contract(&env);
-    
+
     let alice = Address::generate(&env);
     let bob = Address::generate(&env);
-    
+
     // First establish a follow relationship
     client.follow(&alice, &bob);
-    
+
     // Unfollow should emit UnfollowEvent
     client.unfollow(&alice, &bob);
-    
+
     // Verify at least one event was emitted by unfollow
     let all_events = env.events().all();
     let events = all_events.events();
@@ -830,16 +830,16 @@ fn test_unfollow_noop_no_event() {
     let env = Env::default();
     env.mock_all_auths();
     let (client, _, _) = setup_contract(&env);
-    
+
     let alice = Address::generate(&env);
     let bob = Address::generate(&env);
-    
+
     // Unfollow when no relationship exists should not panic
     client.unfollow(&alice, &bob);
-    
+
     // Verify both indexes are still empty
-    assert_eq!(client.get_following(&alice).len(), 0);
-    assert_eq!(client.get_followers(&bob).len(), 0);
+    assert_eq!(client.get_following(&alice, &0, &10).len(), 0);
+    assert_eq!(client.get_followers(&bob, &0, &10).len(), 0);
 }
 
 // ── Post content length validation tests (issue #194) ────────────────────────────
@@ -850,9 +850,9 @@ fn test_post_content_empty() {
     let env = Env::default();
     env.mock_all_auths();
     let (client, _, _) = setup_contract(&env);
-    
+
     let author = Address::generate(&env);
-    
+
     // Empty content should panic
     client.create_post(&author, &String::from_str(&env, ""));
 }
@@ -862,9 +862,9 @@ fn test_post_content_min_length_valid() {
     let env = Env::default();
     env.mock_all_auths();
     let (client, _, _) = setup_contract(&env);
-    
+
     let author = Address::generate(&env);
-    
+
     // 1-character content should succeed
     let post_id = client.create_post(&author, &String::from_str(&env, "a"));
     let post = client.get_post(&post_id).unwrap();
@@ -876,9 +876,9 @@ fn test_post_content_max_length_valid() {
     let env = Env::default();
     env.mock_all_auths();
     let (client, _, _) = setup_contract(&env);
-    
+
     let author = Address::generate(&env);
-    
+
     // 280-character content should succeed
     let content_str = "a".repeat(280);
     let content = String::from_str(&env, &content_str);
@@ -894,9 +894,9 @@ fn test_post_content_too_long() {
     let env = Env::default();
     env.mock_all_auths();
     let (client, _, _) = setup_contract(&env);
-    
+
     let author = Address::generate(&env);
-    
+
     // 281-character content should panic
     let content_str = "a".repeat(281);
     let content = String::from_str(&env, &content_str);
@@ -917,29 +917,29 @@ fn test_get_followers_bumps_followers_key() {
 
     // bob follows alice so alice has a non-empty followers list
     client.follow(&bob, &alice);
-    client.get_followers(&alice);
+    client.get_followers(&alice, &0, &50);
 
     let contract_id = client.address.clone();
 
-    // (FOLLOWERS, alice) must have a bumped TTL
+    // StorageKey::Followers(alice) must have a bumped TTL
     let followers_ttl = env.as_contract(&contract_id, || {
         env.storage()
             .persistent()
-            .get_ttl(&(FOLLOWERS, alice.clone()))
+            .get_ttl(&StorageKey::Followers(alice.clone()))
     });
     assert!(
         followers_ttl >= LEDGER_THRESHOLD,
         "followers TTL {followers_ttl} below LEDGER_THRESHOLD"
     );
 
-    // (FOLLOWS, alice) must NOT exist — get_followers must not touch it
+    // StorageKey::Following(alice) must NOT exist — get_followers must not touch it
     let follows_exists = env.as_contract(&contract_id, || {
         env.storage()
             .persistent()
-            .has(&(FOLLOWS, alice.clone()))
+            .has(&StorageKey::Following(alice.clone()))
     });
     assert!(
         !follows_exists,
-        "get_followers must not create or bump the (FOLLOWS, alice) key"
+        "get_followers must not create or bump the Following(alice) key"
     );
 }

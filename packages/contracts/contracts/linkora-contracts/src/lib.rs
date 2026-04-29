@@ -1,7 +1,7 @@
 #![no_std]
 use soroban_sdk::{
-    contract, contractevent, contractimpl, contracttype, token, Address, BytesN, Env, Map, String,
-    Symbol, Vec,
+    contract, contractevent, contractimpl, contracttype, symbol_short, token, Address, BytesN, Env,
+    Map, String, Symbol, Vec,
 };
 
 // ── Storage Key Enum ──────────────────────────────────────────────────────────
@@ -21,15 +21,12 @@ pub enum StorageKey {
 // ── Instance-storage key constants (small scalars, not contracttype) ──────────
 
 const POST_CT: Symbol = symbol_short!("POST_CT");
-const PROFILES: Symbol = symbol_short!("PROFILES");
 const USERNAMES: Symbol = symbol_short!("UNAMES");
 const PROFILE_CT: Symbol = symbol_short!("PROF_CT");
 const ADMIN: Symbol = symbol_short!("ADMIN");
 const TREASURY: Symbol = symbol_short!("TREASURY");
 const FEE_BPS: Symbol = symbol_short!("FEE_BPS");
 const INITIALIZED: Symbol = symbol_short!("INIT");
-const BLOCKS: Symbol = symbol_short!("BLOCKS");
-const LIKES: Symbol = symbol_short!("LIKES");
 const TIP_COOLDOWN: Symbol = symbol_short!("TIP_CD");
 const TIP_COOLDOWN_WINDOW: Symbol = symbol_short!("TIP_CD_W");
 
@@ -284,6 +281,24 @@ fn username_lookup_key(username: &String) -> (Symbol, String) {
     (USERNAMES, username.clone())
 }
 
+fn paginate<T>(env: &Env, list: &Vec<T>, offset: u32, limit: u32) -> Vec<T>
+where
+    T: soroban_sdk::TryFromVal<Env, soroban_sdk::Val>
+        + soroban_sdk::IntoVal<Env, soroban_sdk::Val>
+        + Clone,
+{
+    let len = list.len();
+    if offset >= len {
+        return Vec::new(env);
+    }
+    let end = (offset + limit).min(len);
+    let mut page = Vec::new(env);
+    for i in offset..end {
+        page.push_back(list.get(i).unwrap());
+    }
+    page
+}
+
 #[contractimpl]
 impl LinkoraContract {
     // ── Initialization ────────────────────────────────────────────────────────
@@ -312,7 +327,7 @@ impl LinkoraContract {
         user.require_auth();
         validate_username(&username).expect("invalid username");
 
-        let key = (PROFILES, user.clone());
+        let key = StorageKey::Profile(user.clone());
         let username_index_key = username_lookup_key(&username);
 
         if let Some(existing_owner) = env
@@ -336,19 +351,11 @@ impl LinkoraContract {
         if !env.storage().persistent().has(&key) {
             let count: u64 = env.storage().instance().get(&PROFILE_CT).unwrap_or(0);
             env.storage().instance().set(&PROFILE_CT, &(count + 1));
-        } else {
-            // Existing profile: remove old username from the reverse index if it changed.
-            let old: Profile = env.storage().persistent().get(&profile_key).unwrap();
-            if old.username != username {
-                env.storage()
-                    .persistent()
-                    .remove(&(USERNAME_IDX, old.username));
-            }
         }
 
         // Write profile.
         env.storage().persistent().set(
-            &profile_key,
+            &key,
             &Profile {
                 address: user.clone(),
                 username: username.clone(),
@@ -375,7 +382,7 @@ impl LinkoraContract {
     }
 
     pub fn get_address_by_username(env: Env, username: String) -> Option<Address> {
-        let key = (USERNAME_IDX, username);
+        let key = username_lookup_key(&username);
         let result: Option<Address> = env.storage().persistent().get(&key);
         if result.is_some() {
             Self::bump(&env, &key);
@@ -458,32 +465,28 @@ impl LinkoraContract {
     }
 
     pub fn get_following(env: Env, user: Address, offset: u32, limit: u32) -> Vec<Address> {
+        assert!(limit <= MAX_PAGE_LIMIT, "limit exceeded");
         let key = StorageKey::Following(user);
         let list: Vec<Address> = env
             .storage()
             .persistent()
             .get(&key)
             .unwrap_or(Vec::new(&env));
-        // Empty lists are never written to persistent storage, so there is no
-        // entry to bump. The TTL is only extended when the list is non-empty.
-        if !result.is_empty() {
+        if !list.is_empty() {
             Self::bump(&env, &key);
         }
         paginate(&env, &list, offset, limit)
     }
 
-    pub fn get_followers(env: Env, user: Address) -> Vec<Address> {
-        // Uses (FOLLOWERS, user) — distinct from the (FOLLOWS, user) key used
-        // by get_following — to avoid bumping the wrong storage entry.
-        let key = (FOLLOWERS, user);
-        let result: Vec<Address> = env
+    pub fn get_followers(env: Env, user: Address, offset: u32, limit: u32) -> Vec<Address> {
+        assert!(limit <= MAX_PAGE_LIMIT, "limit exceeded");
+        let key = StorageKey::Followers(user);
+        let list: Vec<Address> = env
             .storage()
             .persistent()
             .get(&key)
             .unwrap_or(Vec::new(&env));
-        // Empty lists are never written to persistent storage, so there is no
-        // entry to bump. The TTL is only extended when the list is non-empty.
-        if !result.is_empty() {
+        if !list.is_empty() {
             Self::bump(&env, &key);
         }
         paginate(&env, &list, offset, limit)
@@ -823,26 +826,24 @@ impl LinkoraContract {
     }
 
     pub fn get_pool_admins(env: Env, pool_id: Symbol) -> Vec<Address> {
-        let key = (POOLS, pool_id);
-        let pool: Pool = env.storage().persistent().get(&key).expect("pool not found");
+        let key = StorageKey::Pool(pool_id);
+        let pool: Pool = env
+            .storage()
+            .persistent()
+            .get(&key)
+            .expect("pool not found");
         Self::bump(&env, &key);
         pool.admins
     }
 
-    pub fn add_pool_admin(
-        env: Env,
-        signers: Vec<Address>,
-        pool_id: Symbol,
-        new_admin: Address,
-    ) {
-        let key = (POOLS, pool_id.clone());
+    pub fn add_pool_admin(env: Env, signers: Vec<Address>, pool_id: Symbol, new_admin: Address) {
+        let key = StorageKey::Pool(pool_id.clone());
         let mut pool: Pool = env
             .storage()
             .persistent()
             .get(&key)
             .expect("pool not found");
 
-        // Verify threshold signatures from existing admins
         assert!(signers.len() >= pool.threshold, "insufficient signers");
         for signer in signers.iter() {
             assert!(
@@ -852,7 +853,6 @@ impl LinkoraContract {
             signer.require_auth();
         }
 
-        // Check if admin already exists
         assert!(
             !pool.admins.iter().any(|x| x == new_admin),
             "admin already exists"
@@ -863,20 +863,14 @@ impl LinkoraContract {
         Self::bump(&env, &key);
     }
 
-    pub fn remove_pool_admin(
-        env: Env,
-        signers: Vec<Address>,
-        pool_id: Symbol,
-        admin: Address,
-    ) {
-        let key = (POOLS, pool_id.clone());
+    pub fn remove_pool_admin(env: Env, signers: Vec<Address>, pool_id: Symbol, admin: Address) {
+        let key = StorageKey::Pool(pool_id.clone());
         let mut pool: Pool = env
             .storage()
             .persistent()
             .get(&key)
             .expect("pool not found");
 
-        // Verify threshold signatures from existing admins
         assert!(signers.len() >= pool.threshold, "insufficient signers");
         for signer in signers.iter() {
             assert!(
@@ -886,7 +880,6 @@ impl LinkoraContract {
             signer.require_auth();
         }
 
-        // Find and remove the admin
         let initial_len = pool.admins.len();
         let mut new_admins = Vec::new(&env);
         for existing_admin in pool.admins.iter() {
@@ -895,10 +888,8 @@ impl LinkoraContract {
             }
         }
         pool.admins = new_admins;
-        
-        assert!(pool.admins.len() < initial_len, "admin not found");
 
-        // Ensure threshold is still reachable after removal
+        assert!(pool.admins.len() < initial_len, "admin not found");
         assert!(
             pool.threshold <= pool.admins.len(),
             "threshold unreachable after removal"
@@ -908,21 +899,15 @@ impl LinkoraContract {
         Self::bump(&env, &key);
     }
 
-    pub fn update_pool_threshold(
-        env: Env,
-        signers: Vec<Address>,
-        pool_id: Symbol,
-        threshold: u32,
-    ) {
+    pub fn update_pool_threshold(env: Env, signers: Vec<Address>, pool_id: Symbol, threshold: u32) {
         assert!(threshold > 0, "threshold must be positive");
-        let key = (POOLS, pool_id.clone());
+        let key = StorageKey::Pool(pool_id.clone());
         let mut pool: Pool = env
             .storage()
             .persistent()
             .get(&key)
             .expect("pool not found");
 
-        // Verify threshold signatures from existing admins
         assert!(signers.len() >= pool.threshold, "insufficient signers");
         for signer in signers.iter() {
             assert!(
@@ -932,7 +917,6 @@ impl LinkoraContract {
             signer.require_auth();
         }
 
-        // Validate new threshold against admin count
         assert!(
             threshold <= pool.admins.len(),
             "threshold cannot exceed admin count"
