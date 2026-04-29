@@ -424,6 +424,9 @@ fn test_pool_authorization() {
     // Deposit works for anyone with tokens
     client.pool_deposit(&other_user, &pool_id, &token, &100);
 
+    // Verify pool balance was updated
+    assert_eq!(client.get_pool(&pool_id).unwrap().balance, 100);
+
     // Withdrawal by both admins works
     client.pool_withdraw(
         &vec![&env, pool_admin1.clone(), pool_admin2.clone()],
@@ -524,6 +527,35 @@ fn test_pool_withdraw_exceeds_balance() {
         &200,
         &other_user,
     );
+}
+
+#[test]
+#[should_panic(expected = "wrong token for pool")]
+fn test_pool_deposit_wrong_token_rejected() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let (client, admin, _) = setup_contract(&env);
+
+    let pool_admin = Address::generate(&env);
+    let other_user = Address::generate(&env);
+    let correct_token = setup_token(&env, &pool_admin);
+    let wrong_token = setup_token(&env, &pool_admin);
+
+    // Give other_user some wrong tokens
+    StellarAssetClient::new(&env, &wrong_token).mint(&other_user, &1000);
+
+    let pool_id = symbol_short!("pool4");
+    // Create pool with correct_token
+    client.create_pool(
+        &admin,
+        &pool_id,
+        &correct_token,
+        &vec![&env, pool_admin.clone()],
+        &1,
+    );
+
+    // Try to deposit with wrong_token - should panic
+    client.pool_deposit(&other_user, &pool_id, &wrong_token, &100);
 }
 
 #[test]
