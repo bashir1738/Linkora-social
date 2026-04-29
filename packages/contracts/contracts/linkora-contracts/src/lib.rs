@@ -159,6 +159,13 @@ pub struct PostDeleted {
     pub author: Address,
 }
 
+#[contractevent]
+#[derive(Clone)]
+pub struct ProfileDeletedEvent {
+    #[topic]
+    pub user: Address,
+}
+
 // ── Contract ──────────────────────────────────────────────────────────────────
 
 #[contract]
@@ -249,6 +256,80 @@ impl LinkoraContract {
 
     pub fn get_profile_count(env: Env) -> u64 {
         env.storage().instance().get(&PROFILE_CT).unwrap_or(0)
+    }
+
+    pub fn delete_profile(env: Env, user: Address) {
+        user.require_auth();
+
+        let profile_key = (PROFILES, user.clone());
+        if !env.storage().persistent().has(&profile_key) {
+            panic!("profile does not exist");
+        }
+
+        // Remove profile
+        env.storage().persistent().remove(&profile_key);
+
+        // Decrement profile count
+        let count: u64 = env.storage().instance().get(&PROFILE_CT).unwrap_or(0);
+        if count > 0 {
+            env.storage().instance().set(&PROFILE_CT, &(count - 1));
+        }
+
+        // Clean up social graph: remove user from all followers' following lists
+        let followers_key = (FOLLOWERS, user.clone());
+        let followers_list: Vec<Address> = env
+            .storage()
+            .persistent()
+            .get(&followers_key)
+            .unwrap_or(Vec::new(&env));
+
+        for follower in followers_list.iter() {
+            let following_key = (FOLLOWS, follower.clone());
+            let mut following_list: Vec<Address> = env
+                .storage()
+                .persistent()
+                .get(&following_key)
+                .unwrap_or(Vec::new(&env));
+
+            if let Some(index) = following_list.iter().position(|addr| addr == user) {
+                following_list.remove(index as u32);
+                env.storage()
+                    .persistent()
+                    .set(&following_key, &following_list);
+                Self::bump(&env, &following_key);
+            }
+        }
+
+        // Clean up social graph: remove user from all followees' followers lists
+        let following_key = (FOLLOWS, user.clone());
+        let following_list: Vec<Address> = env
+            .storage()
+            .persistent()
+            .get(&following_key)
+            .unwrap_or(Vec::new(&env));
+
+        for followee in following_list.iter() {
+            let followers_key_followee = (FOLLOWERS, followee.clone());
+            let mut followers_list_followee: Vec<Address> = env
+                .storage()
+                .persistent()
+                .get(&followers_key_followee)
+                .unwrap_or(Vec::new(&env));
+
+            if let Some(index) = followers_list_followee.iter().position(|addr| addr == user) {
+                followers_list_followee.remove(index as u32);
+                env.storage()
+                    .persistent()
+                    .set(&followers_key_followee, &followers_list_followee);
+                Self::bump(&env, &followers_key_followee);
+            }
+        }
+
+        // Remove the user's own follow lists
+        env.storage().persistent().remove(&followers_key);
+        env.storage().persistent().remove(&following_key);
+
+        ProfileDeletedEvent { user }.publish(&env);
     }
 
     // ── Social Graph ──────────────────────────────────────────────────────────
