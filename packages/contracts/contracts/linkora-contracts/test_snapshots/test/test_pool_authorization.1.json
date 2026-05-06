@@ -193,6 +193,7 @@
         }
       ]
     ],
+    [],
     [
       [
         "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4",
@@ -324,7 +325,7 @@
               "key": {
                 "vec": [
                   {
-                    "symbol": "POOLS"
+                    "symbol": "Pool"
                   },
                   {
                     "symbol": "pool1"
@@ -418,6 +419,14 @@
                       },
                       "val": {
                         "bool": true
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "TIP_CD_W"
+                      },
+                      "val": {
+                        "u32": 1
                       }
                     },
                     {

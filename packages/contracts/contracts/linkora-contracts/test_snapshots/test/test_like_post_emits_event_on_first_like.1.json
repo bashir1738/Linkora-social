@@ -72,7 +72,38 @@
               "key": {
                 "vec": [
                   {
-                    "symbol": "LIKES"
+                    "symbol": "AuthorPosts"
+                  },
+                  {
+                    "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
+                  }
+                ]
+              },
+              "durability": "persistent",
+              "val": {
+                "vec": [
+                  {
+                    "u64": "1"
+                  }
+                ]
+              }
+            }
+          },
+          "ext": "v0"
+        },
+        "live_until": 535000
+      },
+      {
+        "entry": {
+          "last_modified_ledger_seq": 0,
+          "data": {
+            "contract_data": {
+              "ext": "v0",
+              "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+              "key": {
+                "vec": [
+                  {
+                    "symbol": "Like"
                   },
                   {
                     "u64": "1"
@@ -102,7 +133,7 @@
               "key": {
                 "vec": [
                   {
-                    "symbol": "POSTS"
+                    "symbol": "Post"
                   },
                   {
                     "u64": "1"
@@ -213,6 +244,14 @@
                       },
                       "val": {
                         "u64": "1"
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "TIP_CD_W"
+                      },
+                      "val": {
+                        "u32": 1
                       }
                     },
                     {

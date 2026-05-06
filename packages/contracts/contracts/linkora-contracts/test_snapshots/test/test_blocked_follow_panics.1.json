@@ -51,7 +51,7 @@
               "key": {
                 "vec": [
                   {
-                    "symbol": "BLOCKS"
+                    "symbol": "Blocks"
                   },
                   {
                     "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAK3IM"
@@ -112,6 +112,14 @@
                       },
                       "val": {
                         "bool": true
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "TIP_CD_W"
+                      },
+                      "val": {
+                        "u32": 1
                       }
                     },
                     {

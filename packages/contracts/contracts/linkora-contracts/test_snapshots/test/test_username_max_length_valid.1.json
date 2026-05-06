@@ -54,7 +54,7 @@
               "key": {
                 "vec": [
                   {
-                    "symbol": "PROFILES"
+                    "symbol": "Profile"
                   },
                   {
                     "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
@@ -89,6 +89,33 @@
                     }
                   }
                 ]
+              }
+            }
+          },
+          "ext": "v0"
+        },
+        "live_until": 535000
+      },
+      {
+        "entry": {
+          "last_modified_ledger_seq": 0,
+          "data": {
+            "contract_data": {
+              "ext": "v0",
+              "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+              "key": {
+                "vec": [
+                  {
+                    "symbol": "UNAMES"
+                  },
+                  {
+                    "string": "abcdefghijklmnopqrstuvwxyz123456"
+                  }
+                ]
+              },
+              "durability": "persistent",
+              "val": {
+                "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
               }
             }
           },
@@ -141,6 +168,14 @@
                       },
                       "val": {
                         "u64": "1"
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "TIP_CD_W"
+                      },
+                      "val": {
+                        "u32": 1
                       }
                     },
                     {

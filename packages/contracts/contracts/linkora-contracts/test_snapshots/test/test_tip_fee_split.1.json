@@ -204,7 +204,38 @@
               "key": {
                 "vec": [
                   {
-                    "symbol": "POSTS"
+                    "symbol": "AuthorPosts"
+                  },
+                  {
+                    "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
+                  }
+                ]
+              },
+              "durability": "persistent",
+              "val": {
+                "vec": [
+                  {
+                    "u64": "1"
+                  }
+                ]
+              }
+            }
+          },
+          "ext": "v0"
+        },
+        "live_until": 535000
+      },
+      {
+        "entry": {
+          "last_modified_ledger_seq": 0,
+          "data": {
+            "contract_data": {
+              "ext": "v0",
+              "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+              "key": {
+                "vec": [
+                  {
+                    "symbol": "Post"
                   },
                   {
                     "u64": "1"
@@ -277,6 +308,36 @@
             "contract_data": {
               "ext": "v0",
               "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+              "key": {
+                "vec": [
+                  {
+                    "symbol": "TIP_CD"
+                  },
+                  {
+                    "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAK3IM"
+                  },
+                  {
+                    "u64": "1"
+                  }
+                ]
+              },
+              "durability": "temporary",
+              "val": {
+                "u32": 0
+              }
+            }
+          },
+          "ext": "v0"
+        },
+        "live_until": 535000
+      },
+      {
+        "entry": {
+          "last_modified_ledger_seq": 0,
+          "data": {
+            "contract_data": {
+              "ext": "v0",
+              "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
               "key": "ledger_key_contract_instance",
               "durability": "persistent",
               "val": {
@@ -315,6 +376,14 @@
                       },
                       "val": {
                         "u64": "1"
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "TIP_CD_W"
+                      },
+                      "val": {
+                        "u32": 1
                       }
                     },
                     {

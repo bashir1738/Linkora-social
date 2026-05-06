@@ -72,7 +72,7 @@
               "key": {
                 "vec": [
                   {
-                    "symbol": "FOLLOWRS"
+                    "symbol": "Followers"
                   },
                   {
                     "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAK3IM"
@@ -99,7 +99,7 @@
               "key": {
                 "vec": [
                   {
-                    "symbol": "FOLLOWS"
+                    "symbol": "Following"
                   },
                   {
                     "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
@@ -153,6 +153,14 @@
                       },
                       "val": {
                         "bool": true
+                      }
+                    },
+                    {
+                      "key": {
+                        "symbol": "TIP_CD_W"
+                      },
+                      "val": {
+                        "u32": 1
                       }
                     },
                     {

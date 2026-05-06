@@ -1,6 +1,6 @@
 {
   "generators": {
-    "address": 4,
+    "address": 5,
     "nonce": 0,
     "mux_id": 0
   },
@@ -14,13 +14,16 @@
           "function": {
             "contract_fn": {
               "contract_address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
-              "function_name": "create_post",
+              "function_name": "set_profile",
               "args": [
                 {
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
                 },
                 {
-                  "string": "Post 1"
+                  "string": "alice"
+                },
+                {
+                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAK3IM"
                 }
               ]
             }
@@ -36,13 +39,16 @@
           "function": {
             "contract_fn": {
               "contract_address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
-              "function_name": "create_post",
+              "function_name": "set_profile",
               "args": [
                 {
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
                 },
                 {
-                  "string": "Post 2"
+                  "string": "alice2"
+                },
+                {
+                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAK3IM"
                 }
               ]
             }
@@ -51,30 +57,6 @@
         }
       ]
     ],
-    [],
-    [
-      [
-        "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4",
-        {
-          "function": {
-            "contract_fn": {
-              "contract_address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
-              "function_name": "delete_post",
-              "args": [
-                {
-                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
-                },
-                {
-                  "u64": "1"
-                }
-              ]
-            }
-          },
-          "sub_invocations": []
-        }
-      ]
-    ],
-    [],
     [],
     []
   ],
@@ -98,7 +80,7 @@
               "key": {
                 "vec": [
                   {
-                    "symbol": "AuthorPosts"
+                    "symbol": "Profile"
                   },
                   {
                     "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
@@ -107,12 +89,30 @@
               },
               "durability": "persistent",
               "val": {
-                "vec": [
+                "map": [
                   {
-                    "u64": "1"
+                    "key": {
+                      "symbol": "address"
+                    },
+                    "val": {
+                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
+                    }
                   },
                   {
-                    "u64": "2"
+                    "key": {
+                      "symbol": "creator_token"
+                    },
+                    "val": {
+                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAK3IM"
+                    }
+                  },
+                  {
+                    "key": {
+                      "symbol": "username"
+                    },
+                    "val": {
+                      "string": "alice2"
+                    }
                   }
                 ]
               }
@@ -132,65 +132,16 @@
               "key": {
                 "vec": [
                   {
-                    "symbol": "Post"
+                    "symbol": "UNAMES"
                   },
                   {
-                    "u64": "2"
+                    "string": "alice2"
                   }
                 ]
               },
               "durability": "persistent",
               "val": {
-                "map": [
-                  {
-                    "key": {
-                      "symbol": "author"
-                    },
-                    "val": {
-                      "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
-                    }
-                  },
-                  {
-                    "key": {
-                      "symbol": "content"
-                    },
-                    "val": {
-                      "string": "Post 2"
-                    }
-                  },
-                  {
-                    "key": {
-                      "symbol": "id"
-                    },
-                    "val": {
-                      "u64": "2"
-                    }
-                  },
-                  {
-                    "key": {
-                      "symbol": "like_count"
-                    },
-                    "val": {
-                      "u64": "0"
-                    }
-                  },
-                  {
-                    "key": {
-                      "symbol": "timestamp"
-                    },
-                    "val": {
-                      "u64": "0"
-                    }
-                  },
-                  {
-                    "key": {
-                      "symbol": "tip_total"
-                    },
-                    "val": {
-                      "i128": "0"
-                    }
-                  }
-                ]
+                "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
               }
             }
           },
@@ -239,10 +190,10 @@
                     },
                     {
                       "key": {
-                        "symbol": "POST_CT"
+                        "symbol": "PROF_CT"
                       },
                       "val": {
-                        "u64": "2"
+                        "u64": "1"
                       }
                     },
                     {
@@ -280,26 +231,6 @@
               "key": {
                 "ledger_key_nonce": {
                   "nonce": "801925984706572462"
-                }
-              },
-              "durability": "temporary",
-              "val": "void"
-            }
-          },
-          "ext": "v0"
-        },
-        "live_until": 6311999
-      },
-      {
-        "entry": {
-          "last_modified_ledger_seq": 0,
-          "data": {
-            "contract_data": {
-              "ext": "v0",
-              "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4",
-              "key": {
-                "ledger_key_nonce": {
-                  "nonce": "1033654523790656264"
                 }
               },
               "durability": "temporary",

@@ -134,7 +134,7 @@ stellar --config-dir "$CFG_DIR" contract invoke \
   --network "$NETWORK" \
   --source-account linkora_alice \
   --id "$CONTRACT_ID" \
-  -- create_pool --admin "$ALICE_ADDR" --pool-id community --token "$TOKEN_ID" --admins "[\"$ALICE_ADDR\"]" --threshold 1 >/dev/null
+  -- create_pool --admin "$ALICE_ADDR" --pool-id community --token "$TOKEN_ID" --initial-admins "[\"$ALICE_ADDR\"]" --threshold 1 >/dev/null
 
 stellar --config-dir "$CFG_DIR" contract invoke \
   --network "$NETWORK" \

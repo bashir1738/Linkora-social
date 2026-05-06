@@ -60,6 +60,14 @@
                     },
                     {
                       "key": {
+                        "symbol": "TIP_CD_W"
+                      },
+                      "val": {
+                        "u32": 1
+                      }
+                    },
+                    {
+                      "key": {
                         "symbol": "TREASURY"
                       },
                       "val": {
