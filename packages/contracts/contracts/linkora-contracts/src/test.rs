@@ -272,10 +272,6 @@ fn test_get_posts_by_author_after_delete() {
 }
 
 // ── Post tests ────────────────────────────────────────────────────────────────
-    client.set_profile(&user1, &String::from_str(&env, "alice"), &token);
-    // Different address tries to claim the same username
-    client.set_profile(&user2, &String::from_str(&env, "alice"), &token);
-}
 
 #[test]
 fn test_username_same_user_can_reregister_same_name() {

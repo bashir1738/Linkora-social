@@ -472,31 +472,12 @@ impl LinkoraContract {
 
     pub fn get_following(env: Env, user: Address, offset: u32, limit: u32) -> Vec<Address> {
         assert!(limit > 0 && limit <= MAX_PAGINATION_LIMIT, "limit must be between 1 and 50");
-        
-        let key = (FOLLOWS, user);
-        assert!(limit <= MAX_PAGE_LIMIT, "limit exceeded");
         let key = StorageKey::Following(user);
         let list: Vec<Address> = env
             .storage()
             .persistent()
             .get(&key)
             .unwrap_or(Vec::new(&env));
-        
-        if list.is_empty() {
-            return Vec::new(&env);
-        }
-        
-        let start = offset as usize;
-        if start >= list.len() {
-            return Vec::new(&env);
-        }
-        
-        Self::bump(&env, &key);
-        
-        let end = core::cmp::min(start + limit as usize, list.len());
-        let mut result = Vec::new(&env);
-        for i in start..end {
-            result.push_back(list.get(i as u32).unwrap());
         if !list.is_empty() {
             Self::bump(&env, &key);
         }
