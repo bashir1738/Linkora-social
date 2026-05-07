@@ -595,6 +595,25 @@ impl LinkoraContract {
         });
         assert!(post.author == author, "only author can delete post");
         env.storage().persistent().remove(&key);
+
+        // Remove post ID from author's posts list
+        let author_key = StorageKey::AuthorPosts(author.clone());
+        if let Some(mut author_posts) = env
+            .storage()
+            .persistent()
+            .get::<_, soroban_sdk::Vec<u64>>(&author_key)
+        {
+            if let Some(index) = author_posts.iter().position(|id| id == post_id) {
+                author_posts.remove(index as u32);
+                if author_posts.is_empty() {
+                    env.storage().persistent().remove(&author_key);
+                } else {
+                    env.storage().persistent().set(&author_key, &author_posts);
+                    Self::bump(&env, &author_key);
+                }
+            }
+        }
+
         PostDeleted { post_id, author }.publish(&env);
     }
 

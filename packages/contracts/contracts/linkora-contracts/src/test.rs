@@ -97,10 +97,13 @@ fn test_get_following_first_page() {
     let client = LinkoraContractClient::new(&env, &contract_id);
 
     let alice = Address::generate(&env);
-    let followees: Vec<Address> = (0..10).map(|_| Address::generate(&env)).collect::<Vec<_>>();
+    let mut followees = soroban_sdk::vec![&env];
+    for _ in 0..10 {
+        followees.push_back(Address::generate(&env));
+    }
 
     for followee in followees.iter() {
-        client.follow(&alice, followee);
+        client.follow(&alice, &followee);
     }
 
     let page = client.get_following(&alice, &0, &5);
@@ -117,10 +120,13 @@ fn test_get_following_second_page() {
     let client = LinkoraContractClient::new(&env, &contract_id);
 
     let alice = Address::generate(&env);
-    let followees: Vec<Address> = (0..10).map(|_| Address::generate(&env)).collect::<Vec<_>>();
+    let mut followees = soroban_sdk::vec![&env];
+    for _ in 0..10 {
+        followees.push_back(Address::generate(&env));
+    }
 
     for followee in followees.iter() {
-        client.follow(&alice, followee);
+        client.follow(&alice, &followee);
     }
 
     let page = client.get_following(&alice, &5, &5);
@@ -187,7 +193,28 @@ fn test_get_posts_by_author_first_page() {
     let author = Address::generate(&env);
 
     for i in 0..10 {
-        client.create_post(&author, &String::from_str(&env, &format!("post {}", i)));
+        let post_str = if i == 0 {
+            String::from_str(&env, "post 0")
+        } else if i == 1 {
+            String::from_str(&env, "post 1")
+        } else if i == 2 {
+            String::from_str(&env, "post 2")
+        } else if i == 3 {
+            String::from_str(&env, "post 3")
+        } else if i == 4 {
+            String::from_str(&env, "post 4")
+        } else if i == 5 {
+            String::from_str(&env, "post 5")
+        } else if i == 6 {
+            String::from_str(&env, "post 6")
+        } else if i == 7 {
+            String::from_str(&env, "post 7")
+        } else if i == 8 {
+            String::from_str(&env, "post 8")
+        } else {
+            String::from_str(&env, "post 9")
+        };
+        client.create_post(&author, &post_str);
     }
 
     let page = client.get_posts_by_author(&author, &0, &5);
@@ -206,7 +233,28 @@ fn test_get_posts_by_author_second_page() {
     let author = Address::generate(&env);
 
     for i in 0..10 {
-        client.create_post(&author, &String::from_str(&env, &format!("post {}", i)));
+        let post_str = if i == 0 {
+            String::from_str(&env, "post 0")
+        } else if i == 1 {
+            String::from_str(&env, "post 1")
+        } else if i == 2 {
+            String::from_str(&env, "post 2")
+        } else if i == 3 {
+            String::from_str(&env, "post 3")
+        } else if i == 4 {
+            String::from_str(&env, "post 4")
+        } else if i == 5 {
+            String::from_str(&env, "post 5")
+        } else if i == 6 {
+            String::from_str(&env, "post 6")
+        } else if i == 7 {
+            String::from_str(&env, "post 7")
+        } else if i == 8 {
+            String::from_str(&env, "post 8")
+        } else {
+            String::from_str(&env, "post 9")
+        };
+        client.create_post(&author, &post_str);
     }
 
     let page = client.get_posts_by_author(&author, &5, &5);
@@ -835,7 +883,7 @@ fn test_upgrade_by_admin_succeeds() {
 #[should_panic]
 fn test_upgrade_by_non_admin_panics() {
     let env = Env::default();
-    let (client, admin, _) = setup_contract(&env);
+    let (client, _admin, _) = setup_contract(&env);
 
     let mock_hash = BytesN::from_array(&env, &[1u8; 32]);
 
@@ -910,7 +958,7 @@ fn test_initialize_fee_boundary_max_invalid() {
 fn test_set_fee_zero_valid() {
     let env = Env::default();
     env.mock_all_auths();
-    let (client, admin, _) = setup_contract(&env);
+    let (client, _admin, _) = setup_contract(&env);
 
     // Set fee to 0 should succeed
     client.set_fee(&0);
