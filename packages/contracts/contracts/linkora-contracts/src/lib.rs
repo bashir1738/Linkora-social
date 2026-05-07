@@ -46,6 +46,7 @@ const LEDGER_THRESHOLD: u32 = 535_000 - 100;
 // ── Pagination Limit ──────────────────────────────────────────────────────────
 
 const MAX_PAGE_LIMIT: u32 = 50;
+const MAX_PAGINATION_LIMIT: u32 = 50;
 
 // ── Validation Constants ──────────────────────────────────────────────────────
 
@@ -578,8 +579,6 @@ impl LinkoraContract {
         env.storage().instance().set(&POST_CT, &id);
 
         // Track post ID under author's posts
-        let author_key = (AUTHOR_POSTS, author.clone());
-        // Track this post under the author's list
         let author_key = StorageKey::AuthorPosts(author.clone());
         let mut author_posts: Vec<u64> = env
             .storage()
@@ -590,10 +589,6 @@ impl LinkoraContract {
         env.storage().persistent().set(&author_key, &author_posts);
         Self::bump(&env, &author_key);
 
-        env.events().publish(
-            (symbol_short!("Linkora"), symbol_short!("post"), symbol_short!("v1")),
-            PostCreatedEvent { id, author },
-        );
         PostCreatedEvent { id, author }.publish(&env);
         id
     }
@@ -625,48 +620,13 @@ impl LinkoraContract {
     }
 
     pub fn get_posts_by_author(env: Env, author: Address, offset: u32, limit: u32) -> Vec<u64> {
-        let key = StorageKey::AuthorPosts(author);
-        let list: Vec<u64> = env
-            .storage()
-            .persistent()
-            .get(&key)
-            .expect("post does not exist");
-        assert!(post.author == author, "only author can delete post");
-        env.storage().persistent().remove(&key);
-        
-        // Remove post ID from author's posts list
-        let author_key = (AUTHOR_POSTS, author.clone());
-        if let Some(mut author_posts): Option<Vec<u64>> = env.storage().persistent().get(&author_key) {
-            if let Some(i) = author_posts.iter().position(|&id| id == post_id) {
-                author_posts.remove(i as u32);
-                if author_posts.is_empty() {
-                    env.storage().persistent().remove(&author_key);
-                } else {
-                    env.storage().persistent().set(&author_key, &author_posts);
-                    Self::bump(&env, &author_key);
-                }
-            }
-        }
-        
-        env.events().publish(
-            (symbol_short!("Linkora"), symbol_short!("post_del"), symbol_short!("v1")),
-            PostDeleted { post_id, author },
-        );
-            .unwrap_or(Vec::new(&env));
-        if !list.is_empty() {
-            Self::bump(&env, &key);
-        }
-        paginate(&env, &list, offset, limit)
-    }
-
-    pub fn get_posts_by_author(env: Env, author: Address, offset: u32, limit: u32) -> Vec<u64> {
         assert!(limit > 0 && limit <= MAX_PAGINATION_LIMIT, "limit must be between 1 and 50");
         
-        let author_key = (AUTHOR_POSTS, author);
+        let key = StorageKey::AuthorPosts(author);
         let posts: Vec<u64> = env
             .storage()
             .persistent()
-            .get(&author_key)
+            .get(&key)
             .unwrap_or(Vec::new(&env));
         
         if posts.is_empty() {
@@ -678,14 +638,8 @@ impl LinkoraContract {
             return Vec::new(&env);
         }
         
-        Self::bump(&env, &author_key);
-        
-        let end = core::cmp::min(start + limit as usize, posts.len());
-        let mut result = Vec::new(&env);
-        for i in start..end {
-            result.push_back(posts.get(i as u32).unwrap());
-        }
-        result
+        Self::bump(&env, &key);
+        paginate(&env, &posts, offset, limit)
     }
 
     // ── Reactions ─────────────────────────────────────────────────────────────

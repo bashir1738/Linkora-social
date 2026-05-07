@@ -83,9 +83,8 @@ fn test_username_duplicate_rejected() {
     let user2 = Address::generate(&env);
     let token = Address::generate(&env);
 
-    let following = client.get_following(&alice, &0, &50);
-    assert_eq!(following.len(), 1);
-    assert_eq!(following.get(0).unwrap(), bob.clone());
+    client.set_profile(&user1, &String::from_str(&env, "shared_username"), &token);
+    client.set_profile(&user2, &String::from_str(&env, "shared_username"), &token);
 }
 
 // ── Pagination tests ──────────────────────────────────────────────────────────
