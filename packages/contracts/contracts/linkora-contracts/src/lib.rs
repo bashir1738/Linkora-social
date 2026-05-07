@@ -620,11 +620,6 @@ impl LinkoraContract {
             return Vec::new(&env);
         }
 
-        let start = offset as usize;
-        if start >= posts.len() {
-            return Vec::new(&env);
-        }
-
         Self::bump(&env, &key);
         paginate(&env, &posts, offset, limit)
     }
